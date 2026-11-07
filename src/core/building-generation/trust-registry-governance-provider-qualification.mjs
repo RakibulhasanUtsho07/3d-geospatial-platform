@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { validateTrustRegistryGovernanceProviderProcessReport } from "./trust-registry-governance-provider-process-report.mjs";
+import { verifyTrustRegistryGovernanceProviderProcessReportSignature } from "./trust-registry-governance-provider-process-report-signature.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
@@ -12,6 +13,7 @@ const STEP_CONCLUSIONS = new Set(["success", "failure", "skipped", "pending"]);
 const ARTIFACT_TYPES = new Set([
   "multi-client-concurrency-report",
   "process-restart-report",
+  "process-report-signature",
   "ambiguous-write-report",
   "anchor-independence-review",
   "backup-restore-rollback-report",
@@ -122,7 +124,7 @@ function normalizeProvider(raw, schemaVersion) {
     "status", "providerId", "implementation", "version", "environment",
     "instanceFingerprintSha256", "namespaceFingerprintSha256", "endpointOrigin", "syntheticOnly",
   ];
-  if (schemaVersion === "1.1.0") expectedKeys.push("adapterModuleSha256");
+  if (schemaVersion !== "1.0.0") expectedKeys.push("adapterModuleSha256");
   exactKeys(raw, expectedKeys, "provider");
   if (!["not-provisioned", "provisioned"].includes(raw.status)) {
     throw new TypeError("provider.status is unsupported");
@@ -132,14 +134,14 @@ function normalizeProvider(raw, schemaVersion) {
     if (raw.providerId !== null || raw.implementation !== null || raw.version !== null ||
         raw.environment !== "not-provisioned" || raw.instanceFingerprintSha256 !== null ||
         raw.namespaceFingerprintSha256 !== null || raw.endpointOrigin !== null || raw.syntheticOnly !== true ||
-        (schemaVersion === "1.1.0" && raw.adapterModuleSha256 !== null)) {
+        (schemaVersion !== "1.0.0" && raw.adapterModuleSha256 !== null)) {
       throw new TypeError("not-provisioned provider must not claim a deployment identity or endpoint");
     }
     return {
       status: "not-provisioned", providerId: null, implementation: null, version: null,
       environment: "not-provisioned", instanceFingerprintSha256: null,
       namespaceFingerprintSha256: null, endpointOrigin: null, syntheticOnly: true,
-      ...(schemaVersion === "1.1.0" ? { adapterModuleSha256: null } : {}),
+      ...(schemaVersion !== "1.0.0" ? { adapterModuleSha256: null } : {}),
     };
   }
   const providerId = requireId(raw.providerId, "provider.providerId");
@@ -155,7 +157,7 @@ function normalizeProvider(raw, schemaVersion) {
   if (!hashOk(raw.instanceFingerprintSha256) || !hashOk(raw.namespaceFingerprintSha256)) {
     throw new TypeError("provisioned provider requires SHA-256 instance and namespace fingerprints");
   }
-  if (schemaVersion === "1.1.0" && !hashOk(raw.adapterModuleSha256)) {
+  if (schemaVersion !== "1.0.0" && !hashOk(raw.adapterModuleSha256)) {
     throw new TypeError("D3M-27 provisioned provider requires the exact adapter module SHA-256");
   }
   const endpointUrl = new URL(requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin"));
@@ -180,7 +182,7 @@ function normalizeProvider(raw, schemaVersion) {
     namespaceFingerprintSha256: raw.namespaceFingerprintSha256,
     endpointOrigin,
     syntheticOnly: raw.syntheticOnly,
-    ...(schemaVersion === "1.1.0" ? { adapterModuleSha256: raw.adapterModuleSha256 } : {}),
+    ...(schemaVersion !== "1.0.0" ? { adapterModuleSha256: raw.adapterModuleSha256 } : {}),
   };
 }
 
@@ -211,7 +213,8 @@ function normalizeProviderIntegration(raw, schemaVersion) {
     "status", "runId", "runUrl", "headSha", "fullRunConclusion", "suiteConclusion", "syntheticOnly",
     "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
   ];
-  if (schemaVersion === "1.1.0") expectedKeys.push("processReportArtifactId");
+  if (schemaVersion !== "1.0.0") expectedKeys.push("processReportArtifactId");
+  if (schemaVersion === "1.2.0") expectedKeys.push("processReportSignatureArtifactId");
   exactKeys(raw, expectedKeys, "providerIntegration");
   if (!["not-run", "passed", "failed", "pending"].includes(raw.status)) {
     throw new TypeError("providerIntegration.status is unsupported");
@@ -222,7 +225,8 @@ function normalizeProviderIntegration(raw, schemaVersion) {
         raw.fullRunConclusion !== "not-run" || raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true ||
         raw.providerInstanceFingerprintSha256 !== null ||
         raw.providerNamespaceFingerprintSha256 !== null ||
-        (schemaVersion === "1.1.0" && raw.processReportArtifactId !== null)) {
+        (schemaVersion !== "1.0.0" && raw.processReportArtifactId !== null) ||
+        (schemaVersion === "1.2.0" && raw.processReportSignatureArtifactId !== null)) {
       throw new TypeError("not-run provider integration must not claim a run, provider identity or real-provider result");
     }
     return {
@@ -230,7 +234,8 @@ function normalizeProviderIntegration(raw, schemaVersion) {
       fullRunConclusion: "not-run", suiteConclusion: "not-run", syntheticOnly: true,
       providerInstanceFingerprintSha256: null,
       providerNamespaceFingerprintSha256: null,
-      ...(schemaVersion === "1.1.0" ? { processReportArtifactId: null } : {}),
+      ...(schemaVersion !== "1.0.0" ? { processReportArtifactId: null } : {}),
+      ...(schemaVersion === "1.2.0" ? { processReportSignatureArtifactId: null } : {}),
     };
   }
   if (!Number.isSafeInteger(raw.runId) || raw.runId < 1) throw new TypeError("providerIntegration.runId must be positive");
@@ -254,10 +259,16 @@ function normalizeProviderIntegration(raw, schemaVersion) {
       (raw.status === "pending" && raw.suiteConclusion !== "pending")) {
     throw new TypeError("providerIntegration.status and suiteConclusion must agree");
   }
-  if (schemaVersion === "1.1.0") {
+  if (schemaVersion !== "1.0.0") {
     if (raw.status === "passed") requireId(raw.processReportArtifactId, "providerIntegration.processReportArtifactId");
     else if (raw.processReportArtifactId !== null) {
       throw new TypeError("providerIntegration.processReportArtifactId must be null unless integration status is passed");
+    }
+  }
+  if (schemaVersion === "1.2.0") {
+    if (raw.status === "passed") requireId(raw.processReportSignatureArtifactId, "providerIntegration.processReportSignatureArtifactId");
+    else if (raw.processReportSignatureArtifactId !== null) {
+      throw new TypeError("providerIntegration.processReportSignatureArtifactId must be null unless integration status is passed");
     }
   }
   return { ...raw, runUrl };
@@ -342,8 +353,8 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     "schemaVersion", "manifestId", "generatedAtUtc", "source", "provider",
     "conformanceCi", "providerIntegration", "artifacts", "evidence",
   ], "provider qualification manifest");
-  if (!["1.0.0", "1.1.0"].includes(input.schemaVersion)) {
-    throw new TypeError("schemaVersion must be 1.0.0 or 1.1.0");
+  if (!["1.0.0", "1.1.0", "1.2.0"].includes(input.schemaVersion)) {
+    throw new TypeError("schemaVersion must be 1.0.0, 1.1.0 or 1.2.0");
   }
   const schemaVersion = input.schemaVersion;
   const manifestId = requireId(input.manifestId, "manifestId");
@@ -412,7 +423,7 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     evidence[key] = normalizeEvidence(input.evidence[key], artifactsById, key);
   }
 
-  if (schemaVersion === "1.1.0" && providerIntegration.status === "passed") {
+  if (schemaVersion !== "1.0.0" && providerIntegration.status === "passed") {
     const reportId = providerIntegration.processReportArtifactId;
     const reportArtifact = artifactsById.get(reportId);
     if (!reportArtifact || reportArtifact.type !== "process-restart-report" || reportArtifact.status !== "present") {
@@ -425,7 +436,7 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
       throw new TypeError("D3M-27 process report artifact source URL must identify the exact provider integration workflow run");
     }
   }
-  if (schemaVersion === "1.1.0" && evidence.processRestartVisibility.status === "verified" &&
+  if (schemaVersion !== "1.0.0" && evidence.processRestartVisibility.status === "verified" &&
       (providerIntegration.status !== "passed" ||
        !evidence.processRestartVisibility.artifactIds.includes(providerIntegration.processReportArtifactId))) {
     throw new TypeError("D3M-27 verified processRestartVisibility requires the exact passed provider integration report");
@@ -487,6 +498,9 @@ export function assessTrustRegistryProviderQualification(manifestInput, options 
   if (manifest.schemaVersion === "1.0.0" && integration.status === "passed") {
     add("provider-process-report-not-bound");
   }
+  if (integration.status === "passed" && manifest.schemaVersion !== "1.2.0") {
+    add("provider-process-report-signature-not-bound");
+  }
   if (integration.status !== "passed" || integration.suiteConclusion !== "success") {
     add("real-provider-integration-suite-not-passed");
   }
@@ -534,7 +548,11 @@ export function assessTrustRegistryProviderQualification(manifestInput, options 
  * This establishes byte integrity inside a supplied local evidence directory,
  * not authenticity or truth of the artifact's claims.
  */
-export async function verifyTrustRegistryProviderQualificationArtifacts(manifestInput, artifactRoot) {
+export async function verifyTrustRegistryProviderQualificationArtifacts(manifestInput, artifactRoot, options = {}) {
+  requireObject(options, "artifact verification options");
+  const unsupportedOption = Object.keys(options).find((key) => key !== "trustedReviewerRegistry");
+  if (unsupportedOption) throw new TypeError("unsupported artifact verification option: " + unsupportedOption);
+  const trustedReviewerRegistry = options.trustedReviewerRegistry ?? process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
   const manifest = normalizeTrustRegistryProviderQualificationManifest(manifestInput);
   const root = await realpath(path.resolve(artifactRoot));
   const verifiedArtifactIds = [];
@@ -594,6 +612,67 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
               code: "process-report-invalid",
             });
           }
+          if (manifest.schemaVersion === "1.2.0" && manifest.providerIntegration.status === "passed" &&
+              artifact.id === manifest.providerIntegration.processReportArtifactId) {
+            const signatureArtifact = manifest.artifacts.find((item) =>
+              item.id === manifest.providerIntegration.processReportSignatureArtifactId);
+            if (!signatureArtifact || signatureArtifact.status !== "present" ||
+                signatureArtifact.type !== "process-report-signature") {
+              throw Object.assign(new Error("trusted process-report signature artifact is missing"), {
+                code: "process-report-signature-missing",
+              });
+            }
+            const signatureParts = signatureArtifact.relativePath.split("/");
+            let signatureTarget = root;
+            try {
+              for (let partIndex = 0; partIndex < signatureParts.length; partIndex += 1) {
+                signatureTarget = path.join(signatureTarget, signatureParts[partIndex]);
+                const partInfo = await lstat(signatureTarget);
+                if (partInfo.isSymbolicLink()) throw Object.assign(new Error("symlink"), { code: "symlink" });
+                if (partIndex < signatureParts.length - 1 && !partInfo.isDirectory()) {
+                  throw Object.assign(new Error("not-directory"), { code: "not-directory" });
+                }
+              }
+              const signatureResolved = await realpath(signatureTarget);
+              if (signatureResolved !== signatureTarget || !signatureResolved.startsWith(root + path.sep)) {
+                throw Object.assign(new Error("path-escape"), { code: "path-escape" });
+              }
+              const signatureHandle = await open(signatureTarget, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+              let signatureBytes;
+              try {
+                const signatureInfo = await signatureHandle.stat();
+                if (!signatureInfo.isFile() || signatureInfo.size !== signatureArtifact.bytes || signatureInfo.size > 64 * 1024) {
+                  throw Object.assign(new Error("signature-size"), { code: "process-report-signature-invalid" });
+                }
+                signatureBytes = await signatureHandle.readFile();
+              } finally {
+                await signatureHandle.close();
+              }
+              if (createHash("sha256").update(signatureBytes).digest("hex") !== signatureArtifact.sha256) {
+                throw Object.assign(new Error("signature-hash"), { code: "sha256-mismatch" });
+              }
+              let signatureEnvelope;
+              try {
+                signatureEnvelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(signatureBytes));
+              } catch {
+                throw Object.assign(new Error("signature-json"), { code: "process-report-signature-invalid" });
+              }
+              const signatureVerification = verifyTrustRegistryGovernanceProviderProcessReportSignature({
+                reportBytes: bytes,
+                signatureEnvelope,
+                trustedReviewerRegistry,
+              });
+              if (!signatureVerification.valid) {
+                throw Object.assign(new Error("trusted process-report signature did not verify"), {
+                  code: "process-report-signature-invalid",
+                });
+              }
+            } catch (signatureError) {
+              const code = signatureError && typeof signatureError === "object" && typeof signatureError.code === "string"
+                ? signatureError.code : "process-report-signature-invalid";
+              throw Object.assign(new Error("trusted process-report signature could not be verified"), { code });
+            }
+          }
         }
       } finally {
         await handle.close();
@@ -613,6 +692,8 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
         "sha256-mismatch": "evidence artifact SHA-256 mismatch",
         "process-report-too-large": "process-isolated provider report exceeds the 1 MiB limit",
         "process-report-invalid": "process-isolated provider report does not match the qualified provider context",
+        "process-report-signature-missing": "trusted process-report signature artifact is missing",
+        "process-report-signature-invalid": "trusted process-report signature could not be verified",
         ENOENT: "evidence artifact is missing",
         EACCES: "evidence artifact cannot be read",
         ELOOP: "evidence artifact path contains a symlink",
