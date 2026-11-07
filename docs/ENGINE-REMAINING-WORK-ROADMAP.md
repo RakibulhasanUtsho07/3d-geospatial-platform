@@ -775,5 +775,17 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - The checked-in current-state manifest is upgraded to schema 1.2.0 with null process-report and signature links. Provider remains `not-provisioned`; integration remains `not-run`; all 13 evidence classes remain missing. No reviewer private key, production identity, provider, endpoint or signature evidence is fabricated.
 - CI includes focused positive/adversarial signature tests and CLI help validation on the D3M-28 push/PR branch filters.
 - **Trust boundary:** a trusted reviewer signature authenticates exact report bytes and the signer key identity only. It does not independently prove a report's claims, provision a remote provider, establish independent anchor custody, prove provider rollback resistance, or qualify production. All production qualification, acceptance, publication, map-ready and automatic-approval flags remain false.
-- **Validation status:** implementation and tests are under exact-head Push/PR Full CI verification. Keep D3M-28 Draft/open/unmerged, stacked on D3M-27 PR #390; do not merge, retarget or promote to `development`/`main`.
+- **Final security hardening:** the signing CLI rejects symlinked parent directories for report/key inputs and rejects POSIX private-key files readable by group/other; D3M-25 requires exactly one process-restart report in verified restart evidence—the exact report with its verified signature. CI contains adversarial coverage for both cases.
+- Keep D3M-28 Draft/open/unmerged, stacked on D3M-27 PR #390; do not merge, retarget or promote to `development`/`main`.
 
+
+
+### D3M-ENGINE-28 exact-head Full CI validation addendum — 2026-11-07
+
+- Final implementation/test head `19254bdc1ed29aee4c952bdd8661aba3a49ead89` is fully validated by exact-head **Push Full CI** [#42349916912](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349916912) and **PR Full CI** [#42349920655](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349920655). Both runs completed `success` against that same SHA.
+- Each run completed 232/232 job steps successfully, including post-job cleanup. There were zero failed, cancelled, skipped or incomplete steps.
+- Both runs passed ESLint, the D3M-26 report-binding suite, D3M-28 trusted-signer positive/adversarial and CLI tests, D3M-25 qualification/legacy-compatibility/blocked-manifest checks, production build, Chromium installation, production viewport API/browser/performance verification, and all six evidence upload steps.
+- Each run uploaded seven non-expired artifacts: Ahsan Manzil generated GLB, P2.3 camera alignment, P2.4 render performance, P2.5 performance repeatability, P2.6 dynamic-map workload, multi-tile viewport/Playwright diagnostics, and P3.4 map-panel visual evidence.
+- The final security tests explicitly reject extra unsigned process-restart reports in verified evidence, symlinked report/key parent directories, and POSIX private-key files with group/other access.
+- PR #391 remains Draft/open/unmerged, based on D3M-27 PR #390 exact head `571b864037d728370bc11dc6504f8d8a8106c588`. D3M-27 PR #390 and all parent PRs remain Draft/open/unmerged; no branch was retargeted or promoted.
+- **Trust boundary unchanged:** the signer tests use ephemeral test keys and a synthetic report/provider. The real external provider remains not provisioned/not run, all 13 qualification evidence classes remain missing, and production qualification, acceptance, publication, map-ready and automatic-approval all remain false. These CI results prove the software verification path, not a production provider or the truth of provider claims.
