@@ -273,6 +273,42 @@ test("accepts an omitted base bufferView with no sparse overrides as a zero-init
  assert.equal(report.counts.degenerateTriangleCount,1);
 });
 
+test("defaults an omitted primitive mode to TRIANGLES",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.meshes[0].primitives[0].mode;
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.counts.triangleCount,1);
+ assert.equal(report.counts.vertexCount,3);
+ assert.equal(report.warnings.some(w=>w.includes("not a TRIANGLES primitive")),false);
+});
+
+test("rejects invalid explicit glTF primitive mode values before topology skipping",()=>{
+ const invalidModes=[-1,7,4.5,"4",null,false,[],{}];
+ for(const mode of invalidModes){
+  const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+   state.json.meshes[0].primitives[0].mode=mode;
+  });
+  assert.throws(()=>analyzeGlbQuality(glb),/invalid glTF primitive mode; expected an integer from 0 to 6/, "mode "+JSON.stringify(mode)+" must fail closed");
+ }
+});
+
+test("rejects invalid primitive modes even when POSITION is absent",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  state.json.meshes[0].primitives[0]={mode:7,attributes:{}};
+ });
+ assert.throws(()=>analyzeGlbQuality(glb),/invalid glTF primitive mode; expected an integer from 0 to 6/);
+});
+
+test("keeps valid non-triangle primitives without POSITION as explicit skips",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  state.json.meshes[0].primitives.push({mode:0,attributes:{}});
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.counts.triangleCount,1);
+ assert.ok(report.warnings.includes("mesh 0 primitive 1 has no POSITION accessor and was not counted"));
+});
+
 test("validates POSITION bounds for every supported non-triangle primitive mode",()=>{
  const modes=[0,1,2,3,5,6];
  for(const mode of modes){

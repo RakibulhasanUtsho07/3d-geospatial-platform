@@ -391,3 +391,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Preserve triangle-only geometry counts, referenced-only aggregate bounds and topology metrics; non-triangle modes remain explicitly not counted. No POSITION attribute on a non-triangle primitive remains an explicit skip.
 - Evidence boundary: accessor-metadata coverage only; no new topology support, survey truth, georeferencing or architectural-accuracy claim. Keep all release gates false.
 - Requires exact-head Push/PR Full CI and human review; keep the child PR Draft/open/unmerged.
+
+
+## BRF-04 — validate glTF primitive mode enum (2026-11-07)
+
+- Tracking issue: [#405](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/405).
+- Gap: GLB geometry QA treated any explicit mode other than TRIANGLES as a skippable non-triangle mode, including invalid values outside the glTF enum.
+- Default only an omitted mode to TRIANGLES (4); an explicitly present value must be a safe integer in the range 0–6 or fail closed.
+- Preserve valid non-triangle warning/skip behavior, POSITION metadata validation, triangle-only topology metrics, and explicit no-POSITION skips for valid non-triangle modes.
+- Regression coverage includes all malformed JSON value categories and omitted-mode default behavior.
+- Evidence boundary: primitive metadata validity only; no additional topology support or reconstruction-accuracy claim. All release gates remain false.

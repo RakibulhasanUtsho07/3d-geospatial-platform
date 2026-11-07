@@ -49,3 +49,10 @@ See the [Khronos glTF 2.0 accessor bounds specification](https://registry.khrono
 ## POSITION metadata on unsupported primitive topologies
 
 The adapter validates any supplied base `attributes.POSITION` accessor (layout, sparse substitutions, effective finite values and required `min`/`max` metadata) before it skips primitive topologies other than `TRIANGLES`. POINTS, LINES, LINE_LOOP, LINE_STRIP, TRIANGLE_STRIP and TRIANGLE_FAN still do not contribute to triangle counts, topology metrics or aggregate geometry bounds; they receive the existing not-counted warning. A non-triangle primitive without a POSITION attribute remains skipped with an explicit warning.
+
+
+## Primitive mode enum validation
+
+An omitted primitive `mode` defaults to `TRIANGLES` (4). An explicitly supplied mode must be an integer from 0 through 6: POINTS (0), LINES (1), LINE_LOOP (2), LINE_STRIP (3), TRIANGLES (4), TRIANGLE_STRIP (5) or TRIANGLE_FAN (6). Explicit null, fractional, string, boolean, array/object, negative and greater-than-6 values fail closed; they are not treated as skippable non-triangle modes. This enum validation occurs before POSITION-attribute skip handling. Valid non-triangle modes remain outside the triangle geometry metrics.
+
+See the [Khronos glTF 2.0 mesh primitive specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive).

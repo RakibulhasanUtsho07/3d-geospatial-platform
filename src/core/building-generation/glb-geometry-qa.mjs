@@ -332,7 +332,10 @@ export function analyzeGlbQuality(input,options={}){
   if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError("mesh "+meshIndex+" contains no primitives");
   for(let primitiveIndex=0;primitiveIndex<mesh.primitives.length;primitiveIndex++){
    const primitive=mesh.primitives[primitiveIndex],label="mesh "+meshIndex+" primitive "+primitiveIndex;
-   const mode=primitive.mode??4,positionIndex=primitive.attributes?.POSITION;
+   const mode=primitive.mode===undefined?4:primitive.mode,positionIndex=primitive.attributes?.POSITION;
+   if(!Number.isSafeInteger(mode)||mode<0||mode>6){
+    throw new TypeError(label+" has an invalid glTF primitive mode; expected an integer from 0 to 6");
+   }
    if(positionIndex===undefined){
     if(mode!==4){warnings.push(label+" has no POSITION accessor and was not counted");continue;}
     throw new TypeError(label+" has no valid POSITION accessor");
