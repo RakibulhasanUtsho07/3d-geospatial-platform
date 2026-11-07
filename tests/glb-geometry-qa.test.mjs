@@ -133,6 +133,9 @@ test("falls back to explicit mesh-local bounds when scene graph data is absent",
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:null,scenes:null}),report=analyzeGlbQuality(glb);
  assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.bounds.units,"mesh-local-unverified");
  assert.ok(report.warnings.includes("scene-graph-unavailable-mesh-local-bounds-fallback"));
+ assert.equal(report.counts.meshInstanceCount,0);assert.equal(report.counts.boundsTransformCount,1);
+ assert.equal(report.meshDetails[0].sceneInstanceCount,0);assert.equal(report.meshDetails[0].boundsTransformCount,1);
+ assert.equal(report.scene.localFallback,true);
 });
 test("uses only the declared default scene when a GLB contains multiple scenes",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
@@ -166,6 +169,24 @@ test("excludes mesh definitions not instanced in the active scene from aggregate
  assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
  assert.ok(report.warnings.includes("uninstanced-mesh-definitions-excluded-from-scene-bounds"));
  assert.equal(report.counts.meshInstanceCount,1);
+});
+
+test("preserves scene node count when selected scene has nodes but no mesh instances",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
+  nodes:[{translation:[5,0,0]}],scenes:[{nodes:[0]}]
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
+ assert.equal(report.counts.sceneNodeCount,1);assert.equal(report.counts.meshInstanceCount,0);
+ assert.equal(report.counts.boundsTransformCount,1);assert.equal(report.scene.localFallback,true);
+ assert.ok(report.warnings.includes("selected-scene-has-no-mesh-instances-local-bounds-fallback"));
+});
+
+test("bounds the node definition array before allocating traversal state",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
+  nodes:[{mesh:0},{translation:[1,0,0]}],scenes:[{nodes:[0]}]
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxSceneNodes:1}),/node definition array exceeds maxSceneNodes/);
 });
 
 test("fails closed on invalid node transforms, hierarchy cycles and duplicate parenting",()=>{

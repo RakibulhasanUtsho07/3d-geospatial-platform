@@ -140,10 +140,11 @@ function resolveSceneMeshInstances(gltf,options={}){
  const meshes=gltf.meshes;
  const maxSceneNodes=boundedOption(options.maxSceneNodes,100000,1,250000,"maxSceneNodes");
  const maxSceneMeshInstances=boundedOption(options.maxSceneMeshInstances,10000,1,100000,"maxSceneMeshInstances");
- const localFallback=(reason)=>{
-  const instancesByMesh=new Map(meshes.map((_,index)=>[index,[Float64Array.from(IDENTITY_MATRIX)]]));
-  return {sceneIndex:null,nodeCount:0,meshInstanceCount:meshes.length,instancesByMesh,boundsSpace:"mesh-local-unverified",uninstancedMeshDefinitionCount:0,warning:reason};
- };
+ const localFallback=(reason,sceneIndex=null,nodeCount=0)=>({
+  sceneIndex,nodeCount,meshInstanceCount:0,boundsTransformCount:meshes.length,
+  instancesByMesh:new Map(),boundsSpace:"mesh-local-unverified",localFallback:true,
+  uninstancedMeshDefinitionCount:0,warning:reason,
+ });
  const nodes=gltf.nodes,scenes=gltf.scenes;
  if(!Array.isArray(nodes)||!Array.isArray(scenes)||!scenes.length){
   if(Array.isArray(scenes)&&scenes.some(scene=>Array.isArray(scene?.nodes)&&scene.nodes.length))throw new TypeError("glTF scenes reference nodes but the nodes array is missing");
@@ -155,6 +156,7 @@ function resolveSceneMeshInstances(gltf,options={}){
  if(!selectedScene||typeof selectedScene!=="object"||Array.isArray(selectedScene))throw new TypeError("glTF selected scene must be an object");
  const roots=selectedScene.nodes===undefined?[]:selectedScene.nodes;
  if(!Array.isArray(roots))throw new TypeError("glTF selected scene nodes must be an array");
+ if(nodes.length>maxSceneNodes)throw new RangeError("glTF node definition array exceeds maxSceneNodes "+maxSceneNodes);
  if(roots.length>maxSceneNodes)throw new RangeError("glTF selected scene exceeds maxSceneNodes "+maxSceneNodes);
  const state=new Uint8Array(nodes.length),instancesByMesh=new Map(),stack=[];
  for(let i=roots.length-1;i>=0;i--)stack.push({nodeIndex:roots[i],parentMatrix:Float64Array.from(IDENTITY_MATRIX),depth:0,exit:false});
@@ -186,9 +188,9 @@ function resolveSceneMeshInstances(gltf,options={}){
   for(let i=children.length-1;i>=0;i--)stack.push({nodeIndex:children[i],parentMatrix:worldMatrix,depth:entry.depth+1,exit:false});
   pendingNodeCount+=children.length;
  }
- if(meshInstanceCount===0)return localFallback("selected-scene-has-no-mesh-instances-local-bounds-fallback");
+ if(meshInstanceCount===0)return localFallback("selected-scene-has-no-mesh-instances-local-bounds-fallback",sceneIndex,nodeCount);
  const uninstancedMeshDefinitionCount=meshes.length-instancesByMesh.size;
- return {sceneIndex,nodeCount,meshInstanceCount,instancesByMesh,boundsSpace:"scene-space-unverified",uninstancedMeshDefinitionCount,warning:uninstancedMeshDefinitionCount?"uninstanced-mesh-definitions-excluded-from-scene-bounds":null};
+ return {sceneIndex,nodeCount,meshInstanceCount,boundsTransformCount:meshInstanceCount,instancesByMesh,boundsSpace:"scene-space-unverified",localFallback:false,uninstancedMeshDefinitionCount,warning:uninstancedMeshDefinitionCount?"uninstanced-mesh-definitions-excluded-from-scene-bounds":null};
 }
 function computeBounds(min,max,units){
  if(!min.every(finite)||!max.every(finite))throw new TypeError("model bounds are non-finite");
@@ -241,7 +243,7 @@ export function analyzeGlbQuality(input,options={}){
    const primitiveUnreferencedVertexCount=count-primitiveReferencedVertexCount;
    referencedVertexCount+=primitiveReferencedVertexCount;
    unreferencedVertexCount+=primitiveUnreferencedVertexCount;
-   const transforms=scene.instancesByMesh.get(meshIndex)??[];
+   const transforms=scene.localFallback?[IDENTITY_MATRIX]:(scene.instancesByMesh.get(meshIndex)??[]);
    const requiredEvaluations=primitiveReferencedVertexCount*transforms.length;
    if(!Number.isSafeInteger(requiredEvaluations)||boundsVertexEvaluations+requiredEvaluations>maxSceneBoundsVertexEvaluations)throw new RangeError("scene-space bounds exceed maxSceneBoundsVertexEvaluations "+maxSceneBoundsVertexEvaluations);
    boundsVertexEvaluations+=requiredEvaluations;
@@ -260,7 +262,7 @@ export function analyzeGlbQuality(input,options={}){
     maxSmallComponentTriangles:options.maxSmallComponentTriangles
    });
    for(const warning of topology.warnings)topologyWarnings.add(warning);
-   meshDetails.push({meshIndex,primitiveIndex,vertexCount:count,referencedVertexCount:primitiveReferencedVertexCount,unreferencedVertexCount:primitiveUnreferencedVertexCount,sceneInstanceCount:transforms.length,topologyCoordinateSpace:"mesh-local",triangleCount:triangles,degenerateTriangleCount:degenerate,materialIndex:primitive.material??null,topology});
+   meshDetails.push({meshIndex,primitiveIndex,vertexCount:count,referencedVertexCount:primitiveReferencedVertexCount,unreferencedVertexCount:primitiveUnreferencedVertexCount,sceneInstanceCount:scene.localFallback?0:transforms.length,boundsTransformCount:transforms.length,topologyCoordinateSpace:"mesh-local",triangleCount:triangles,degenerateTriangleCount:degenerate,materialIndex:primitive.material??null,topology});
   }
  }
  if(!primitiveCount||!triangleCount)throw new TypeError("GLB contains no triangle geometry supported by this QA adapter");
@@ -283,8 +285,8 @@ export function analyzeGlbQuality(input,options={}){
  const status=warnings.length?"review-recommended":"basic-geometry-check-passed";
  return {
   schemaVersion:"1.0.0",engine:"glb-geometry-qa-v2",status,valid:true,format:"glb",
-  counts:{meshCount:gltf.meshes.length,primitiveCount,meshInstanceCount:scene.meshInstanceCount,sceneNodeCount:scene.nodeCount,boundsVertexEvaluations,vertexCount,referencedVertexCount,unreferencedVertexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
-  bounds,meshDetails,warnings,externalUris,scene:{index:scene.sceneIndex,nodeCount:scene.nodeCount,meshInstanceCount:scene.meshInstanceCount,boundsSpace:scene.boundsSpace,boundsVertexEvaluations,maxSceneBoundsVertexEvaluations},
+  counts:{meshCount:gltf.meshes.length,primitiveCount,meshInstanceCount:scene.meshInstanceCount,boundsTransformCount:scene.boundsTransformCount,sceneNodeCount:scene.nodeCount,boundsVertexEvaluations,vertexCount,referencedVertexCount,unreferencedVertexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
+  bounds,meshDetails,warnings,externalUris,scene:{index:scene.sceneIndex,nodeCount:scene.nodeCount,meshInstanceCount:scene.meshInstanceCount,boundsTransformCount:scene.boundsTransformCount,localFallback:scene.localFallback,boundsSpace:scene.boundsSpace,boundsVertexEvaluations,maxSceneBoundsVertexEvaluations},
   limitations:["Geometry QA verifies GLB structure and computes heuristic mesh-topology hints; it does not verify architectural fidelity, real-world scale, up-axis, WGS84 georeference, camera calibration, or same-building identity.","Boundary edges can be expected on intentionally open surfaces; disconnected components can also be legitimate separate architectural parts, so topology warnings require visual review.","Unreferenced POSITION entries remain subject to accessor-size and finite-coordinate validation, but do not affect model bounds, model diagonal or topology scale; they are counted and reported separately.","Topology analysis welds near-coincident positions using a scale-relative tolerance and may be skipped above the configured per-primitive vertex limit.","Aggregate bounds apply the selected glTF scene node transforms when available and remain un-georeferenced; topology metrics are mesh-local.", "Static QA does not evaluate animation, skinning or morph-target deformation."],
  };
 }
