@@ -990,7 +990,7 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
       await writeFile(target, bytes);
     }
     const verification = await verifyArtifacts(manifest, root, trustedReviewerRegistry, {
-      independentAnchorKeyRegistry,
+      independentAnchorKeyRegistry: canonicalJson(independentAnchorKeyRegistry),
       independentAnchorGovernanceKeyFingerprintSha256: governancePublicKeyFingerprintSha256,
       now: verificationNow,
     });
