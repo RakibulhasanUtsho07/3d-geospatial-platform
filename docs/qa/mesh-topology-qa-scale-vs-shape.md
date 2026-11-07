@@ -30,7 +30,7 @@ For mesh-local fallback reports, `scene.meshInstanceCount` remains zero because 
 
 ## glTF 2.0 sparse accessors
 
-The geometry QA adapter resolves sparse POSITION and primitive-index accessors before referenced-vertex accounting, topology evaluation and scene-space bounds. A dense base `bufferView` is read first; when it is absent the accessor base is zero-initialized as specified by glTF, then sparse replacements are applied.
+The geometry QA adapter resolves sparse POSITION and primitive-index accessors before referenced-vertex accounting, topology evaluation and scene-space bounds. A dense base `bufferView` is read first; when it is absent the accessor base is zero-initialized as specified by glTF, then sparse replacements are applied. POSITION finiteness is checked against the final overlaid accessor values, so overridden dense-base bytes do not incorrectly invalidate the effective sparse accessor.
 
 Sparse replacement indices must be strictly increasing and inside the accessor count. Sparse index/value bufferViews are required to reference the embedded GLB buffer, must not define `target` or `byteStride`, and must satisfy component alignment and tightly packed range bounds. Sparse index component types are limited to unsigned byte, unsigned short and unsigned int. Sparse entry counts are capped by the configurable `maxSparseEntries` guard. Malformed sparse data fails closed.
 

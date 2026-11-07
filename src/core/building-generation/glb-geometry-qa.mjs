@@ -111,19 +111,26 @@ function readPositions(accessor,views,binary,bufferLength,label,maxVertices,maxS
  if(data.first!==null){
   for(let i=0;i<data.count;i++){
    const offset=data.first+i*data.stride;
-   const x=binary.readFloatLE(offset),y=binary.readFloatLE(offset+4),z=binary.readFloatLE(offset+8);
-   if(!finite(x)||!finite(y)||!finite(z))throw new TypeError(label+" contains a non-finite vertex coordinate at vertex "+i);
-   positions[i*3]=x;positions[i*3+1]=y;positions[i*3+2]=z;
+   positions[i*3]=binary.readFloatLE(offset);
+   positions[i*3+1]=binary.readFloatLE(offset+4);
+   positions[i*3+2]=binary.readFloatLE(offset+8);
   }
  }
  if(data.sparse){
   for(let entry=0;entry<data.sparse.count;entry++){
    const vertex=data.sparse.indices[entry],offset=vertex*3;
    for(let component=0;component<3;component++){
-    const value=data.sparse.readValue(entry,component);
-    if(!finite(value))throw new TypeError(label+" sparse values contain a non-finite coordinate at vertex "+vertex);
-    positions[offset+component]=value;
+    positions[offset+component]=data.sparse.readValue(entry,component);
    }
+  }
+ }
+ // Sparse replacements define the final accessor values. Validate only after
+ // applying them so an invalid dense base value fully overridden by sparse
+ // data cannot reject an otherwise valid effective accessor.
+ for(let i=0;i<data.count;i++){
+  const offset=i*3;
+  if(!finite(positions[offset])||!finite(positions[offset+1])||!finite(positions[offset+2])){
+   throw new TypeError(label+" contains a non-finite vertex coordinate at vertex "+i);
   }
  }
  return positions;

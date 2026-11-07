@@ -96,6 +96,22 @@ test("applies sparse POSITION replacements over a dense base accessor",()=>{
  assert.equal(report.counts.referencedVertexCount,3);assert.equal(report.counts.degenerateTriangleCount,0);
 });
 
+test("validates dense POSITION values after sparse replacements are applied",()=>{
+ const makeOverlay=(nonFiniteVertex)=>mutateGlb(makeGlb([
+  0,0,0,0,0,0,0,1,0
+ ],[0,1,2]),state=>{
+  if(nonFiniteVertex!==null)state.binary.writeFloatLE(Number.NaN,nonFiniteVertex*12);
+  const indexView=addSparseView(state,Buffer.from([1]),1);
+  const valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const overridden=analyzeGlbQuality(makeOverlay(1));
+ assert.deepEqual(overridden.bounds.min,[0,0,0]);
+ assert.deepEqual(overridden.bounds.max,[1,1,0]);
+ assert.equal(overridden.counts.degenerateTriangleCount,0);
+ assert.throws(()=>analyzeGlbQuality(makeOverlay(0)),/non-finite vertex coordinate at vertex 0/);
+});
+
 test("supports zero-initialized POSITION accessors without a base bufferView",()=>{
  const glb=mutateGlb(makeGlb([0,0,0,0,0,0,0,0,0],[0,1,2]),state=>{
   delete state.json.accessors[0].bufferView;
