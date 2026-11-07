@@ -214,6 +214,151 @@ export async function runTrustRegistryGovernanceProviderConformance({
   successfulWriteVersions.add(recovered.version);
   assert.equal(recovered.state.revision, reloaded.state.revision + 1);
 
+  // A timeout before commit is safe to retry only after a read proves that
+  // the exact expected version and digest are still current.
+  const nextAfterPreCommitTimeout = createNextTrustRegistryGovernanceState({
+    current: recovered.state,
+    ...identity,
+    expectedRevision: recovered.state.revision,
+    acceptedSequence: bootstrapMinimumSequence + 3,
+    acceptedAttestationSha256: sha256("D3M-24 attestation C " + nonce),
+    acceptedSnapshotSha256: sha256("D3M-24 registry snapshot C " + nonce),
+    now: new Date("2026-11-05T12:03:00.000Z"),
+  }).state;
+  const preCommitRetryPayload = {
+    identity,
+    expectedVersion: recovered.version,
+    expectedStateSha256: recovered.state.stateSha256,
+    nextState: clone(nextAfterPreCommitTimeout),
+  };
+  const preCommitTimeoutClient = {
+    ...reopenedProvider,
+    async compareAndSetState() {
+      throw Object.assign(new Error("synthetic timeout before provider commit"), {
+        code: "D3M24_SIMULATED_TIMEOUT_BEFORE_COMMIT",
+      });
+    },
+  };
+  try {
+    await preCommitTimeoutClient.compareAndSetState(preCommitRetryPayload);
+    assert.fail("the synthetic pre-commit timeout must be observed");
+  } catch (error) {
+    assert.equal(error.code, "D3M24_SIMULATED_TIMEOUT_BEFORE_COMMIT",
+      "only the expected pre-commit timeout is accepted");
+  }
+  const afterPreCommitTimeout = assertSnapshot(
+    await reopenedProvider.readState(identity),
+    identity,
+    "pre-commit timeout recovery read",
+  );
+  assert.equal(afterPreCommitTimeout.state.stateSha256, recovered.state.stateSha256,
+    "a pre-commit timeout must leave the expected prior state unchanged");
+  assert.equal(afterPreCommitTimeout.version, recovered.version,
+    "a pre-commit timeout must leave the expected provider version unchanged");
+  assert.deepEqual(afterPreCommitTimeout.anchor, recovered.anchor,
+    "a pre-commit timeout must leave the expected anchor unchanged");
+  const safeRetry = assertWriteResult(
+    await reopenedProvider.compareAndSetState(preCommitRetryPayload),
+    "updated",
+    identity,
+    "safe retry after pre-commit timeout",
+  );
+  assert.equal(safeRetry.updated, true,
+    "the original CAS may be retried only after the read confirms its exact precondition");
+  assert.equal(safeRetry.state.stateSha256, nextAfterPreCommitTimeout.stateSha256,
+    "the safe retry must commit the exact intended state");
+  assert.equal(successfulWriteVersions.has(safeRetry.version), false,
+    "the safe retry must receive a never-before-used provider version");
+  successfulWriteVersions.add(safeRetry.version);
+
+  // If another writer wins while the caller times out, read-back must expose
+  // that different committed state and the timed-out intent must not be replayed.
+  const nextIntendedDuringRace = createNextTrustRegistryGovernanceState({
+    current: safeRetry.state,
+    ...identity,
+    expectedRevision: safeRetry.state.revision,
+    acceptedSequence: bootstrapMinimumSequence + 4,
+    acceptedAttestationSha256: sha256("D3M-24 intended concurrent attestation " + nonce),
+    acceptedSnapshotSha256: sha256("D3M-24 intended concurrent snapshot " + nonce),
+    now: new Date("2026-11-05T12:04:00.000Z"),
+  }).state;
+  const concurrentWinnerState = createNextTrustRegistryGovernanceState({
+    current: safeRetry.state,
+    ...identity,
+    expectedRevision: safeRetry.state.revision,
+    acceptedSequence: bootstrapMinimumSequence + 4,
+    acceptedAttestationSha256: sha256("D3M-24 competing attestation " + nonce),
+    acceptedSnapshotSha256: sha256("D3M-24 competing snapshot " + nonce),
+    now: new Date("2026-11-05T12:04:01.000Z"),
+  }).state;
+  assert.notEqual(nextIntendedDuringRace.stateSha256, concurrentWinnerState.stateSha256,
+    "the concurrent intent and competing writer must be distinct transitions");
+  let timedOutIntentAttempts = 0;
+  const competingAmbiguousClient = {
+    ...reopenedProvider,
+    async compareAndSetState() {
+      timedOutIntentAttempts += 1;
+      const competingCommit = assertWriteResult(
+        await reopenedProvider.compareAndSetState({
+          identity,
+          expectedVersion: safeRetry.version,
+          expectedStateSha256: safeRetry.state.stateSha256,
+          nextState: clone(concurrentWinnerState),
+        }),
+        "updated",
+        identity,
+        "competing writer commit",
+      );
+      assert.equal(competingCommit.updated, true,
+        "the competing writer must win the expected-version race");
+      throw Object.assign(new Error("synthetic response lost while competing writer committed"), {
+        code: "D3M24_SIMULATED_COMPETING_COMMIT",
+      });
+    },
+  };
+  try {
+    await competingAmbiguousClient.compareAndSetState({
+      identity,
+      expectedVersion: safeRetry.version,
+      expectedStateSha256: safeRetry.state.stateSha256,
+      nextState: clone(nextIntendedDuringRace),
+    });
+    assert.fail("the synthetic competing-commit timeout must be observed");
+  } catch (error) {
+    assert.equal(error.code, "D3M24_SIMULATED_COMPETING_COMMIT",
+      "only the expected competing-commit response loss is accepted");
+  }
+  const afterCompetingCommit = assertSnapshot(
+    await reopenedProvider.readState(identity),
+    identity,
+    "competing commit recovery read",
+  );
+  assert.equal(afterCompetingCommit.state.stateSha256, concurrentWinnerState.stateSha256,
+    "recovery must identify the competing writer's exact committed state");
+  assert.notEqual(afterCompetingCommit.state.stateSha256, nextIntendedDuringRace.stateSha256,
+    "a different committed state must never be mistaken for the timed-out intent");
+  assert.equal(timedOutIntentAttempts, 1,
+    "the timed-out intent must not be blindly replayed after a competing commit");
+  assert.equal(successfulWriteVersions.has(afterCompetingCommit.version), false,
+    "the competing winner must also receive a never-before-used provider version");
+  successfulWriteVersions.add(afterCompetingCommit.version);
+  const timedOutIntentConflict = assertWriteResult(
+    await reopenedProvider.compareAndSetState({
+      identity,
+      expectedVersion: safeRetry.version,
+      expectedStateSha256: safeRetry.state.stateSha256,
+      nextState: clone(nextIntendedDuringRace),
+    }),
+    "updated",
+    identity,
+    "timed-out intent stale retry check",
+  );
+  assert.equal(timedOutIntentConflict.updated, false,
+    "the old timed-out intent must now fail its original CAS precondition");
+  assert.equal(timedOutIntentConflict.state.stateSha256, concurrentWinnerState.stateSha256);
+  assert.equal(timedOutIntentConflict.version, afterCompetingCommit.version);
+  assert.deepEqual(timedOutIntentConflict.anchor, afterCompetingCommit.anchor);
+
   // A provider must partition records by the complete registry identity. A
   // second fresh identity must not see or overwrite the first identity's state.
   const secondNonce = randomUUID();
@@ -259,8 +404,12 @@ export async function runTrustRegistryGovernanceProviderConformance({
     freshProviderReopened: reopenedProvider !== provider,
     freshReadMatched: recovered.state.stateSha256 === nextAfterAmbiguous.stateSha256,
     ambiguousCommitRecovered: responseWasLost,
+    preCommitTimeoutSafeRetry: safeRetry.state.stateSha256 === nextAfterPreCommitTimeout.stateSha256,
+    ambiguousCompetingWinnerDetected:
+      afterCompetingCommit.state.stateSha256 === concurrentWinnerState.stateSha256 &&
+      afterCompetingCommit.state.stateSha256 !== nextIntendedDuringRace.stateSha256,
     identityIsolationVerified: true,
-    finalRevision: recovered.state.revision,
-    finalMinimumAcceptedSequence: recovered.state.minimumAcceptedSequence,
+    finalRevision: afterCompetingCommit.state.revision,
+    finalMinimumAcceptedSequence: afterCompetingCommit.state.minimumAcceptedSequence,
   });
 }
