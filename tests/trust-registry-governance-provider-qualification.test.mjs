@@ -32,6 +32,40 @@ const evidenceTypes = {
   independentSecurityReview: "independent-security-review",
 };
 
+function processReport(manifest) {
+  return {
+    schemaVersion: "1.1.0",
+    sourceCommitSha,
+    providerId: manifest.provider.providerId,
+    adapterModuleSha256: manifest.provider.adapterModuleSha256,
+    adapterDeclaredSyntheticOnly: manifest.provider.syntheticOnly,
+    providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+    providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+    executionMode: "fresh-node-child-process-per-provider-operation",
+    processIsolationVerified: true,
+    workerProcessesStarted: 43,
+    uniqueWorkerInstances: 43,
+    uniqueWorkerProcessIds: 8,
+    conformance: {
+      providerId: manifest.provider.providerId,
+      initializeContenders: 8,
+      initializeWinners: 1,
+      casContenders: 8,
+      casWinners: 1,
+      staleCasRejected: true,
+      freshProviderReopened: true,
+      freshReadMatched: true,
+      ambiguousCommitRecovered: true,
+      preCommitTimeoutSafeRetry: true,
+      ambiguousCompetingWinnerDetected: true,
+      identityIsolationVerified: true,
+      finalRevision: 4,
+      finalMinimumAcceptedSequence: 9,
+    },
+    trustBoundary: "Software conformance only. Adapter declarations are not independently authenticated. This report does not prove provider deployment, independent anchor custody, rollback resistance, security controls or production durability.",
+  };
+}
+
 function run({ id, event, conclusion = "success", headSha = sourceCommitSha } ) {
   return {
     runId: id,
@@ -87,6 +121,7 @@ function currentManifest() {
 
 function completeManifest() {
   const manifest = currentManifest();
+  manifest.schemaVersion = "1.1.0";
   manifest.provider = {
     status: "provisioned",
     providerId: "provider-staging-a",
@@ -96,6 +131,7 @@ function completeManifest() {
     instanceFingerprintSha256: digest("provider instance"),
     namespaceFingerprintSha256: digest("isolated provider namespace"),
     endpointOrigin: "https://provider.example",
+    adapterModuleSha256: digest("provider adapter module"),
     syntheticOnly: false,
   };
   manifest.conformanceCi.push.fullRunConclusion = "success";
@@ -110,11 +146,14 @@ function completeManifest() {
     syntheticOnly: false,
     providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+    processReportArtifactId: "evidence-processrestartvisibility",
   };
   manifest.artifacts = [];
   for (const key of TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS) {
     const id = "evidence-" + key.toLowerCase();
-    const bytes = "independent provider evidence for " + key;
+    const bytes = key === "processRestartVisibility"
+      ? JSON.stringify(processReport(manifest)) + "\\n"
+      : "independent provider evidence for " + key;
     manifest.artifacts.push({
       id,
       type: evidenceTypes[key],
@@ -141,7 +180,10 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.equal(schema.properties.evidence.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
   assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
-  assert.equal(schema.properties.schemaVersion.const, "1.0.0");
+  assert.deepEqual(schema.properties.schemaVersion.enum, ["1.0.0", "1.1.0"]);
+  assert.ok(schema.properties.provider.required.includes("adapterModuleSha256") === false,
+    "D3M-25 schema 1.0.0 remains backward compatible");
+  assert.ok(schema.properties.providerIntegration.properties.processReportArtifactId);
   assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
   assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
   assert.equal(
@@ -178,9 +220,11 @@ test("complete hash-bound provider evidence reaches review only, never productio
     for (const artifact of manifest.artifacts) {
       const target = path.join(root, artifact.relativePath);
       await mkdir(path.dirname(target), { recursive: true });
-      const bytes = "independent provider evidence for " +
-        TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((key) =>
-          artifact.id === "evidence-" + key.toLowerCase());
+      const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
+        artifact.id === "evidence-" + candidate.toLowerCase());
+      const bytes = key === "processRestartVisibility"
+        ? JSON.stringify(processReport(manifest)) + "\\n"
+        : "independent provider evidence for " + key;
       await writeFile(target, bytes);
     }
     const verified = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
@@ -514,3 +558,79 @@ test("qualification validator CLI rejects symlinked, oversized and malformed man
   }
 });
 
+
+test("legacy D3M-25 passed provider manifests remain readable but cannot skip the D3M-27 process-report binding", () => {
+  const manifest = completeManifest();
+  manifest.schemaVersion = "1.0.0";
+  delete manifest.provider.adapterModuleSha256;
+  delete manifest.providerIntegration.processReportArtifactId;
+  const normalized = normalizeTrustRegistryProviderQualificationManifest(manifest);
+  assert.equal(normalized.schemaVersion, "1.0.0");
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("provider-process-report-not-bound"));
+  assert.equal(report.productionQualificationEligible, false);
+  assert.deepEqual(report.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});
+
+test("D3M-27 refuses a process report artifact that is not bound to processRestartVisibility evidence", () => {
+  const manifest = completeManifest();
+  manifest.evidence.processRestartVisibility.artifactIds = [];
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /processRestartVisibility evidence must reference the exact provider integration report artifact/i);
+});
+
+test("D3M-27 refuses a passed provider integration without its report artifact", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.processReportArtifactId = "missing-process-report";
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /present process-restart-report artifact/i);
+});
+
+test("D3M-27 byte verification also validates process report semantics and exact provider identity", async () => {
+  const manifest = completeManifest();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m27-report-semantic-"));
+  try {
+    for (const artifact of manifest.artifacts) {
+      const target = path.join(root, artifact.relativePath);
+      await mkdir(path.dirname(target), { recursive: true });
+      const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
+        artifact.id === "evidence-" + candidate.toLowerCase());
+      let bytes = key === "processRestartVisibility"
+        ? JSON.stringify(processReport(manifest)) + "\\n"
+        : "independent provider evidence for " + key;
+      await writeFile(target, bytes);
+    }
+    let result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    assert.equal(result.failures.length, 0);
+    assert.ok(result.verifiedArtifactIds.includes(manifest.providerIntegration.processReportArtifactId));
+
+    const reportArtifact = manifest.artifacts.find((artifact) =>
+      artifact.id === manifest.providerIntegration.processReportArtifactId);
+    const reportPath = path.join(root, reportArtifact.relativePath);
+    const tamperedReport = processReport(manifest);
+    tamperedReport.providerNamespaceFingerprintSha256 = digest("substituted namespace");
+    await writeFile(reportPath, JSON.stringify(tamperedReport) + "\\n");
+    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    assert.ok(result.failures.some((failure) =>
+      failure.id === reportArtifact.id && failure.code === "sha256-mismatch"));
+
+    reportArtifact.bytes = Buffer.byteLength(JSON.stringify(tamperedReport) + "\\n");
+    reportArtifact.sha256 = digest(JSON.stringify(tamperedReport) + "\\n");
+    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    assert.ok(result.failures.some((failure) =>
+      failure.id === reportArtifact.id && failure.code === "process-report-invalid"),
+    "a correctly re-hashed but semantically substituted report must remain invalid");
+    const assessment = assessTrustRegistryProviderQualification(manifest, { artifactVerification: result });
+    assert.equal(assessment.status, "blocked");
+    assert.ok(assessment.blockers.includes("evidence-artifact-not-byte-verified:" + reportArtifact.id));
+    assert.ok(assessment.blockers.includes("artifact-verification-failed:" + reportArtifact.id + ":process-report-invalid"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
