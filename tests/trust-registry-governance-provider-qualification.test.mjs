@@ -146,7 +146,10 @@ test("checked-in provider qualification state is valid but blocked without a rea
   assert.equal(report.productionQualificationEligible, false);
   assert.ok(report.blockers.includes("real-provider-not-provisioned"));
   assert.ok(report.blockers.includes("real-provider-integration-suite-not-passed"));
-  assert.ok(report.blockers.includes("conformance-ci-push-full-run-not-success"));
+  assert.equal(report.blockers.includes("conformance-ci-push-full-run-not-success"), false,
+    "the checked-in D3M-24 Push Full CI record must reflect its completed exact-head success");
+  assert.equal(report.blockers.includes("conformance-ci-pullRequest-full-run-not-success"), false,
+    "the checked-in D3M-24 PR Full CI record must reflect its completed exact-head success");
   assert.ok(report.blockers.includes("evidence-missing:independentAnchorCustody"));
   assert.deepEqual(report.releaseFlags, {
     acceptanceEligible: false,
