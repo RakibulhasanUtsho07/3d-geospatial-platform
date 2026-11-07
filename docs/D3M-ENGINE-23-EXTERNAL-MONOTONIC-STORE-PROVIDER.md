@@ -45,11 +45,12 @@ The verifier loads the anchored state, computes the effective floor as the maxim
 Run:
 
     npm run test:trust-registry-governance-external-store
+    npm run test:trust-registry-governance-provider-conformance
     npm run test:building-review-package-integrity
     npm run lint
     npm run build
 
-Tests use synthetic in-memory state and anchor values only. They verify adapter behavior, including old-state substitution against a newer anchor; they do not establish a production provider.
+Tests use synthetic in-memory state and anchor values only. They verify adapter behavior, including old-state substitution against a newer anchor; they do not establish a production provider. The D3M-24 conformance harness adds concurrent initialize/CAS, stale-writer and ambiguous-response checks against an isolated synthetic identity. See `docs/D3M-ENGINE-24-PROVIDER-CONFORMANCE.md` for provider-specific integration requirements.
 
 ## Current status
 

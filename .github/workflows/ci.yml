@@ -105,6 +105,7 @@ on:
       - feat/d3m-engine21-signed-trust-registry-governance-20261105
       - feat/d3m-engine22-persisted-governance-state-20261105
       - feat/d3m-engine23-external-monotonic-store-provider-20261105
+      - feat/d3m-engine24-provider-conformance-20261105
 
   workflow_dispatch:
   pull_request:
@@ -131,6 +132,7 @@ on:
       - feat/d3m-engine21-signed-trust-registry-governance-20261105
       - feat/d3m-engine22-persisted-governance-state-20261105
       - feat/d3m-engine23-external-monotonic-store-provider-20261105
+      - feat/d3m-engine24-provider-conformance-20261105
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -241,6 +243,9 @@ jobs:
 
       - name: Test external monotonic trust-registry governance store provider
         run: npm run test:trust-registry-governance-external-store
+
+      - name: Test external governance provider contract conformance
+        run: npm run test:trust-registry-governance-provider-conformance
 
       - name: Validate survey-device enrollment evidence verifier CLI
         run: npm run verify:survey-device-enrollment-evidence -- --help
