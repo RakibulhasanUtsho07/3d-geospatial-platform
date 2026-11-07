@@ -137,6 +137,8 @@ export async function runTrustRegistryGovernanceProviderConformance({
   for (const result of committed) {
     assert.equal(result.state.stateSha256, next.stateSha256,
       "losing writers must observe the committed state, not overwrite it");
+    assert.equal(result.version, winner.version,
+      "losing compare-and-set callers must observe the winner's provider version");
     assert.deepEqual(result.anchor, winner.anchor,
       "losing writers must observe the winner's anchor");
   }
@@ -147,6 +149,10 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.equal(stale.updated, false, "a stale version token must be rejected");
   assert.equal(stale.state.stateSha256, next.stateSha256,
     "stale CAS must preserve the winning state");
+  assert.equal(stale.version, winner.version,
+    "a stale CAS response must return the current winning provider version");
+  assert.deepEqual(stale.anchor, winner.anchor,
+    "a stale CAS response must preserve the current winning anchor");
 
   // Reconstruct a client and verify that its read observes the same backing record.
   // A provider-specific integration may implement reopenProvider across a process boundary.
