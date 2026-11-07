@@ -146,10 +146,14 @@ function normalizeProvider(raw) {
     throw new TypeError("provisioned provider requires SHA-256 instance and namespace fingerprints");
   }
   const endpointUrl = new URL(requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin"));
-  const hostname = endpointUrl.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  const hostname = endpointUrl.hostname.toLowerCase().replaceAll("[", "").replaceAll("]", "");
+  const ipv4Parts = hostname.split(".");
+  const isLoopbackIpv4 = ipv4Parts.length === 4 &&
+    ipv4Parts.every((part) => /^[0-9]{1,3}$/.test(part) && Number(part) <= 255) &&
+    Number(ipv4Parts[0]) === 127;
   if (endpointUrl.pathname !== "/" || hostname === "localhost" ||
       hostname.endsWith(".localhost") || hostname === "::1" ||
-      /^127(?:\\.[0-9]{1,3}){3}$/.test(hostname) || hostname === "0.0.0.0") {
+      isLoopbackIpv4 || hostname === "0.0.0.0") {
     throw new TypeError("provider.endpointOrigin must be a remote HTTPS origin, not a local/loopback endpoint");
   }
   const endpointOrigin = endpointUrl.origin;
