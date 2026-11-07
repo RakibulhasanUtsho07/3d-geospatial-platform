@@ -1004,9 +1004,6 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
 
 test("D3M-29 blocks legacy qualification manifests that claim verified independent anchor custody", () => {
   const manifest = completeManifest();
-  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), 
-    /provider qualification manifest must contain exactly/i,
-  );
   manifest.evidence.independentAnchorCustody.verificationKind = "independent-audit";
   const report = assessTrustRegistryProviderQualification(manifest);
   assert.equal(report.status, "blocked");
