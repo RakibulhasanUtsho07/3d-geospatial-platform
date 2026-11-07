@@ -10,7 +10,7 @@ import { canonicalJson } from "./generation-artifact-receipt.mjs";
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,119}$/;
-const DOMAIN = Buffer.from("3d-geospatial-platform/d3m29-independent-anchor-witness/v1\\0", "utf8");
+const DOMAIN = Buffer.from("3d-geospatial-platform/d3m29-independent-anchor-witness/v1\0", "utf8");
 const PURPOSE = "independent-anchor-fresh-challenge-response-not-provider-qualification";
 const REGISTRY_MAX_BYTES = 64 * 1024;
 const CHALLENGE_MAX_BYTES = 64 * 1024;
@@ -66,7 +66,7 @@ function safeCommit(value, label) {
 
 function utc(value, label) {
   if (typeof value !== "string" ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value)) {
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
     throw new TypeError(label + " must be a canonical UTC timestamp with milliseconds");
   }
   const parsed = new Date(value);
@@ -143,7 +143,7 @@ export function createTrustRegistryGovernanceProviderAnchorChallenge({
     providerInstanceFingerprintSha256: context.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: context.namespaceFingerprintSha256,
   });
-  const bytes = Buffer.from(canonicalJson(challenge) + "\\n", "utf8");
+  const bytes = Buffer.from(canonicalJson(challenge) + "\n", "utf8");
   return Object.freeze({
     challenge,
     bytes,
@@ -176,7 +176,7 @@ export function buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes({
   return Buffer.concat([
     DOMAIN,
     Buffer.from(canonicalJson(signingContext(witness)), "utf8"),
-    Buffer.from("\\0", "utf8"),
+    Buffer.from("\0", "utf8"),
     challengeBytes,
   ]);
 }
