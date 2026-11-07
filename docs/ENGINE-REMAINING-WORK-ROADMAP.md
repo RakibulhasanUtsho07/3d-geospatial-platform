@@ -351,3 +351,62 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The prior P3.4 baseline failed its clean-tree provenance gate because the benchmark's own nested artifact directory appeared in Git status. The benchmark now parses NUL-delimited porcelain status and excludes only its own output subtree; tracked edits and all other untracked paths remain dirty. A temp-Git-repository regression test covers nested generated evidence plus unrelated tracked/untracked changes.
 - The P3.4 current-main candidate must still pass exact-head Full CI and the six-sample clean working-tree Real-Dhaka baseline. Until both succeed and the resulting screenshots/report are inspected, P3.4 is not accepted as complete. The diagnostics do not prove that the previous red imagery anomaly has been fixed.
 - The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
+
+
+## BRF-04 — glTF scene-transformed aggregate geometry bounds (2026-11-07)
+
+- Tracking issue: [#397](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/397).
+- Gap: GLB geometry QA aggregated referenced POSITION coordinates in mesh-local space and did not apply the active glTF scene node hierarchy or repeated mesh instances.
+- Candidate applies column-major node matrices or TRS composition through parent-child nodes; every active-scene mesh instance contributes to aggregate bounds while topology diagnostics remain mesh-local.
+- Safety checks validate scene graph structure and transform inputs; node traversal, mesh instances and transformed vertex evaluations are bounded. GLBs without scene metadata use an explicitly warned mesh-local fallback. Animations, skinning and morph targets remain outside static QA.
+- Evidence boundary: scene-space bounds remain un-georeferenced; topology metrics remain mesh-local. No real-world scale, survey truth, architectural accuracy or publication eligibility is implied.
+- Validation: candidate implementation is being prepared against PR #395. Exact-head Full CI and human review are required; keep all release flags false.
+
+
+## BRF-04 — glTF 2.0 sparse accessor support (2026-11-07)
+
+- Tracking issue: [#399](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/399).
+- Gap: the GLB QA adapter rejected sparse POSITION/index accessors and required dense base bufferViews, although valid glTF 2.0 assets may use zero-initialized bases plus strictly-increasing sparse replacements.
+- Candidate resolves dense or zero-initialized base values, then applies bounded sparse POSITION and index overrides before geometry/topology/scene-bounds evaluation. POSITION finiteness is validated only after sparse overlays, so only effective accessor values determine validity.
+- Validates unsigned sparse index types, strictly increasing unique index order, accessor index range, byte ranges, embedded-buffer references, no target/byteStride metadata, component alignment and tight packing. `maxSparseEntries` is an explicit memory bound.
+- Evidence boundary: this increases glTF input compatibility only; it does not prove geometry accuracy, georeferencing, survey truth or publication eligibility. PR #398 scene-transform and topology semantics remain unchanged.
+- Validation: exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged and release gates false.
+
+
+## BRF-04 — glTF POSITION accessor min/max validation (2026-11-07)
+
+- Tracking issue: [#401](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/401).
+- Gap: GLB QA consumed POSITION data but ignored the required accessor-level `min` and `max` metadata.
+- Validate both three-component finite arrays against all decoded POSITION vertices after sparse substitution. FLOAT32 declarations compare after `Math.fround`. Unreferenced POSITION entries remain part of accessor min/max even though they are excluded from referenced-only mesh bounds.
+- Preserve the glTF no-bufferView/no-sparse zero-initialized exception: bounds fields remain required for POSITION but numeric values are not compared against zero; values must remain representable as float32.
+- Evidence boundary: accessor metadata consistency only; no georeferencing, survey truth, real-world scale or architectural accuracy is implied. All release flags stay false.
+- Exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged.
+
+
+## BRF-04 — POSITION bounds before non-triangle topology skip (2026-11-07)
+
+- Tracking issue: [#403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/403).
+- Gap: the triangle-only GLB QA adapter returned early for non-TRIANGLES modes before validating their supplied POSITION accessor data and mandatory min/max metadata.
+- Validate supported POSITION accessor layout, sparse overlays, effective finite values and float32-rounded accessor bounds before the topology-mode skip.
+- Preserve triangle-only geometry counts, referenced-only aggregate bounds and topology metrics; non-triangle modes remain explicitly not counted. No POSITION attribute on a non-triangle primitive remains an explicit skip.
+- Evidence boundary: accessor-metadata coverage only; no new topology support, survey truth, georeferencing or architectural-accuracy claim. Keep all release gates false.
+- Requires exact-head Push/PR Full CI and human review; keep the child PR Draft/open/unmerged.
+
+
+## BRF-04 — validate glTF primitive mode enum (2026-11-07)
+
+- Tracking issue: [#405](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/405).
+- Gap: GLB geometry QA treated any explicit mode other than TRIANGLES as a skippable non-triangle mode, including invalid values outside the glTF enum.
+- Default only an omitted mode to TRIANGLES (4); an explicitly present value must be a safe integer in the range 0–6 or fail closed.
+- Preserve valid non-triangle warning/skip behavior, POSITION metadata validation, triangle-only topology metrics, and explicit no-POSITION skips for valid non-triangle modes.
+- Regression coverage includes all malformed JSON value categories and omitted-mode default behavior.
+- Evidence boundary: primitive metadata validity only; no additional topology support or reconstruction-accuracy claim. All release gates remain false.
+
+
+## BRF-04 — bound triangle index counts in GLB geometry QA (2026-11-07)
+
+- Tracking issue: [#407](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/407).
+- Gap: explicit index accessor counts without a base bufferView (including sparse-only accessors) could declare unbounded work; non-indexed primitives also create an implicit index stream.
+- Add a cumulative per-GLB `maxIndices` budget (default 15,000,000; permitted range 3–60,000,000), and reject over-cap per-stream or aggregate counts before per-index processing.
+- Apply the same budget to explicit, sparse-only and non-indexed triangle streams; report the total in `counts.indexCount`.
+- Evidence boundary: resource-safety bound only; no topology expansion, architectural accuracy, georeferencing, survey or publication claim. Keep all release gates false.

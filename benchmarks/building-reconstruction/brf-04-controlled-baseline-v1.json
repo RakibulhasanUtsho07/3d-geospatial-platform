@@ -6,8 +6,23 @@
   "provenance": {
     "type": "synthetic-known-geometry",
     "description": "Deterministic closed cuboid created by the test fixture; not a real building and not independent survey evidence.",
-    "authoritativeFor": ["GLB parser integrity", "axis-aligned model-space bounds", "dimension tolerance logic", "degenerate-triangle detection"],
-    "notAuthoritativeFor": ["architectural similarity", "photo reconstruction quality", "real-world scale", "georeference", "heritage fidelity"]
+    "authoritativeFor": [
+      "GLB parser integrity",
+      "axis-aligned model-space bounds",
+      "dimension tolerance logic",
+      "degenerate-triangle detection",
+      "non-manifold edge detection",
+      "boundary edge detection",
+      "connected component detection",
+      "small detached component detection"
+    ],
+    "notAuthoritativeFor": [
+      "architectural similarity",
+      "photo reconstruction quality",
+      "real-world scale",
+      "georeference",
+      "heritage fidelity"
+    ]
   },
   "expectedDimensionsM": {
     "x": 10,
@@ -20,22 +35,81 @@
     "validGlb": true,
     "meshCount": 1,
     "triangleCount": 12,
-    "degenerateTriangleCount": 0
+    "degenerateTriangleCount": 0,
+    "topology": {
+      "topologyAnalyzed": true,
+      "connectedComponentCount": 1,
+      "boundaryEdgeCount": 0,
+      "nonManifoldEdgeCount": 0,
+      "smallDetachedComponentCount": 0
+    }
   },
   "defectCases": [
     {
       "id": "scale-y-plus-20-percent",
-      "injection": { "type": "scale-axis", "axis": "y", "factor": 1.2 },
-      "expectedDimensionsM": { "x": 10, "y": 9.6, "z": 6 },
+      "injection": {
+        "type": "scale-axis",
+        "axis": "y",
+        "factor": 1.2
+      },
+      "expectedDimensionsM": {
+        "x": 10,
+        "y": 9.6,
+        "z": 6
+      },
       "expectedOutcome": "dimension-mismatch-review-required",
       "expectedMaxRelativeErrorPercent": 20
     },
     {
       "id": "degenerate-triangle",
-      "injection": { "type": "duplicate-triangle-index", "triangleIndex": 0 },
+      "injection": {
+        "type": "duplicate-triangle-index",
+        "triangleIndex": 0
+      },
       "expectedOutcome": "geometry-warning",
       "expectedWarning": "degenerate-triangles-present",
       "expectedMinimumDegenerateTriangleCount": 1
+    },
+    {
+      "id": "non-manifold-shared-edge",
+      "injection": {
+        "type": "third-use-of-shared-edge",
+        "triangleIndex": 2,
+        "edgeVertexIndices": [
+          0,
+          2
+        ],
+        "thirdVertexIndex": 6
+      },
+      "expectedOutcome": "geometry-warning",
+      "expectedWarning": "non-manifold-edges-present",
+      "expectedMinimumNonManifoldEdgeCount": 1
+    },
+    {
+      "id": "open-boundary-edge",
+      "injection": {
+        "type": "remove-triangle",
+        "triangleIndex": 0
+      },
+      "expectedOutcome": "geometry-warning",
+      "expectedWarning": "open-boundary-edges-present",
+      "expectedMinimumBoundaryEdgeCount": 3,
+      "expectedTriangleCount": 11
+    },
+    {
+      "id": "disconnected-small-component",
+      "injection": {
+        "type": "replace-triangle-with-detached-triangle",
+        "triangleIndex": 11
+      },
+      "expectedOutcome": "geometry-warning",
+      "expectedWarnings": [
+        "disconnected-mesh-components-present",
+        "small-detached-components-present"
+      ],
+      "expectedMinimumConnectedComponentCount": 2,
+      "expectedMinimumSmallDetachedComponentCount": 1,
+      "expectedTriangleCount": 12
     }
   ],
   "policy": {

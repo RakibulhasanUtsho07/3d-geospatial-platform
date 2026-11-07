@@ -23,6 +23,56 @@ test("welds duplicated seam vertices so adjacent textured triangles remain one c
   assert.ok(!result.warnings.includes("disconnected-mesh-components-present"));
 });
 
+test("ignores unreferenced positions for topology scale and preserves the memory guard", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    1000000, -1000000, 2000000,
+  ]);
+  const indices = triangleIndices([0, 1, 2]);
+  const result = analyzeTriangleTopology(positions, indices);
+
+  assert.equal(result.vertexCount, 4);
+  assert.equal(result.referencedVertexCount, 3);
+  assert.equal(result.unreferencedVertexCount, 1);
+  assert.equal(result.modelDiagonal, Number(Math.SQRT2.toFixed(6)));
+  assert.equal(result.topologyAnalyzed, true);
+  assert.ok(!result.warnings.includes("long-triangle-edges-present"));
+
+  const bounded = analyzeTriangleTopology(positions, indices, { maxTopologyVertices: 3 });
+  assert.equal(bounded.topologyAnalyzed, false);
+  assert.equal(bounded.topologySkipReason, "vertex-limit");
+});
+
+test("keeps referenced-only scale when topology maps are skipped by the full accessor limit", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    1000000, -1000000, 2000000,
+  ]);
+  const bounded = analyzeTriangleTopology(positions, triangleIndices([0, 1, 2]), {
+    maxTopologyVertices: 3,
+  });
+
+  assert.equal(bounded.topologyAnalyzed, false);
+  assert.equal(bounded.topologySkipReason, "vertex-limit");
+  assert.equal(bounded.vertexCount, 4);
+  assert.equal(bounded.referencedVertexCount, 3);
+  assert.equal(bounded.unreferencedVertexCount, 1);
+  assert.equal(bounded.modelDiagonal, Number(Math.SQRT2.toFixed(6)));
+  assert.ok(!bounded.warnings.includes("long-triangle-edges-present"));
+});
+
+test("continues rejecting non-finite unreferenced positions", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    Number.NaN, 0, 0,
+  ]);
+
+  assert.throws(
+    () => analyzeTriangleTopology(positions, triangleIndices([0, 1, 2])),
+    /non-finite coordinate/,
+  );
+});
+
 test("detects detached triangle islands and reports the small detached component", () => {
   const positions = new Float32Array([
     0, 0, 0, 1, 0, 0, 0, 1, 0,

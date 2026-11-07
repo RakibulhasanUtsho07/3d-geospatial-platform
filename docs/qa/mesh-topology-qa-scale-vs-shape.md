@@ -8,3 +8,56 @@ The GLB topology audit reports two distinct measurements that must not be confla
 Defaults are `maxLongEdgeRatio = 0.15`, `maxTriangleEdgeRatio = 8`, and `maxLongEdgeTriangleRatio = 0.01`. A large, proportionate wall/roof triangle may contribute raw long-edge telemetry without producing a warning. A long, thin triangle can still trigger the warning. Options are validated; the triangle aspect-ratio threshold must be greater than 1 and at most 1000.
 
 This heuristic is still only a triage signal. It does not prove that flagged geometry is defective, and a clean report does not certify architectural accuracy, watertightness, real-world dimensions, texture quality or georeferencing. Degenerate triangles, boundary edges, non-manifold edges and disconnected components are reported separately.
+
+## Unreferenced POSITION vertices
+
+A primitive can carry POSITION accessor entries that no triangle index uses. Those entries are still parsed, counted against the existing accessor-size guard, and rejected if any coordinate is non-finite. They must not affect the primitive's measured min/max bounds, topology `modelDiagonal`, long-edge thresholds, vertex-welding set or connected-component measurements. The existing topology-analysis vertex limit remains based on the full POSITION accessor count because it is a memory-safety guard, not a scale heuristic.
+
+The report preserves `counts.vertexCount` as the total POSITION accessor count and adds `referencedVertexCount` and `unreferencedVertexCount`. The same two counters are included in each `meshDetails` entry and the topology result; a non-zero unreferenced count produces the review warning `unreferenced-vertices-present`. This warning is diagnostic only and does not prove that a model is architecturally wrong.
+
+
+For a non-indexed `TRIANGLES` primitive, glTF uses sequential vertex order as the implicit triangle index stream. Every `POSITION` entry is therefore referenced and the unreferenced counters remain zero.
+
+
+## Scene-space bounds versus mesh-local topology
+
+Aggregate `bounds` follow the active glTF scene (the declared default scene, or scene 0 when scenes are present but no default is declared). Node `matrix` or TRS transforms are composed through the parent-child hierarchy and every mesh instance contributes referenced POSITION vertices to the scene-space axis-aligned bounds. If no scene graph is available, the report uses an explicit mesh-local fallback warning. Mesh definitions not instanced in the active scene are still structurally/topologically checked but do not affect scene-space bounds.
+
+Per-primitive topology measurements remain in mesh-local coordinates. They are scale-relative review hints, not per-instance deformed-surface analysis. Static QA does not evaluate glTF animations, skinning or morph-target deformation. Scene-space bounds remain un-georeferenced and do not establish real-world dimensions, survey truth or architectural accuracy. A configurable bounded scene-node, mesh-instance and transformed-vertex budget prevents pathological scene graphs from causing unbounded work.
+
+
+For mesh-local fallback reports, `scene.meshInstanceCount` remains zero because no active-scene mesh instance was resolved; `boundsTransformCount` records the identity fallback applied to each mesh definition.
+
+## glTF 2.0 sparse accessors
+
+The geometry QA adapter resolves sparse POSITION and primitive-index accessors before referenced-vertex accounting, topology evaluation and scene-space bounds. A dense base `bufferView` is read first; when it is absent the accessor base is zero-initialized as specified by glTF, then sparse replacements are applied. POSITION finiteness is checked against the final overlaid accessor values, so overridden dense-base bytes do not incorrectly invalidate the effective sparse accessor.
+
+Sparse replacement indices must be strictly increasing and inside the accessor count. Sparse index/value bufferViews are required to reference the embedded GLB buffer, must not define `target` or `byteStride`, and must satisfy component alignment and tightly packed range bounds. Sparse index component types are limited to unsigned byte, unsigned short and unsigned int. Sparse entry counts are capped by the configurable `maxSparseEntries` guard. Malformed sparse data fails closed.
+
+See the [Khronos glTF 2.0 sparse accessor specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-sparse).
+
+
+## POSITION accessor bounds metadata
+
+Every mesh POSITION accessor must declare three-component `min` and `max` arrays. The geometry QA adapter compares those declarations against the decoded accessor values after sparse substitution, using float32 rounding (`Math.fround`) for the JSON values. The comparison includes unreferenced POSITION entries because accessor bounds describe the entire accessor, even though unreferenced vertices remain excluded from referenced-only geometry and topology bounds.
+
+For accessors with neither a base `bufferView` nor sparse replacements, glTF defines a zero-initialized accessor and permits the declared `min`/`max` values to be arbitrary representable component values; QA still requires both POSITION bounds fields to be present but does not compare them to zero.
+
+See the [Khronos glTF 2.0 accessor bounds specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-bounds).
+
+
+## POSITION metadata on unsupported primitive topologies
+
+The adapter validates any supplied base `attributes.POSITION` accessor (layout, sparse substitutions, effective finite values and required `min`/`max` metadata) before it skips primitive topologies other than `TRIANGLES`. POINTS, LINES, LINE_LOOP, LINE_STRIP, TRIANGLE_STRIP and TRIANGLE_FAN still do not contribute to triangle counts, topology metrics or aggregate geometry bounds; they receive the existing not-counted warning. A non-triangle primitive without a POSITION attribute remains skipped with an explicit warning.
+
+
+## Primitive mode enum validation
+
+An omitted primitive `mode` defaults to `TRIANGLES` (4). An explicitly supplied mode must be an integer from 0 through 6: POINTS (0), LINES (1), LINE_LOOP (2), LINE_STRIP (3), TRIANGLES (4), TRIANGLE_STRIP (5) or TRIANGLE_FAN (6). Explicit null, fractional, string, boolean, array/object, negative and greater-than-6 values fail closed; they are not treated as skippable non-triangle modes. This enum validation occurs before POSITION-attribute skip handling. Valid non-triangle modes remain outside the triangle geometry metrics.
+
+See the [Khronos glTF 2.0 mesh primitive specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive).
+
+
+## Bounded triangle index work
+
+The geometry QA adapter applies a configurable `maxIndices` total work budget across the entire GLB before reading or iterating triangle index streams. The default is 15,000,000 indices; callers may set a value from 3 through 60,000,000. The budget covers every explicit index accessor (including sparse-only accessors whose base is zero-initialized) and every implicit index stream from non-indexed triangle primitives. Per-stream and cumulative counts are checked before per-index iteration; an aggregate count that would exceed the configured limit fails closed before that stream is processed. The report exposes the total as `counts.indexCount`. This is a resource-safety bound, not a geometry-quality or accuracy metric.

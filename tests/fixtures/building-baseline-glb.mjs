@@ -128,3 +128,156 @@ export function injectDegenerateTriangleDefect(glb, { triangleIndex = 0 } = {}) 
   binary.writeUInt16LE(binary.readUInt16LE(first), first + 2);
   return encodeGlb(gltf, binary);
 }
+
+
+/**
+ * Convert an existing non-degenerate triangle into a third use of a known
+ * shared edge in the controlled cuboid. The resulting GLB remains parseable,
+ * but the edge-use count must exceed two and trigger topology review.
+ */
+export function injectNonManifoldEdgeDefect(glb) {
+  const { gltf, binary } = splitGlb(glb);
+  const primitive = gltf.meshes?.[0]?.primitives?.[0];
+  const positionAccessor = gltf.accessors?.[primitive?.attributes?.POSITION];
+  const indexAccessor = gltf.accessors?.[primitive?.indices];
+  const view = gltf.bufferViews?.[indexAccessor?.bufferView];
+  if (!positionAccessor ||
+      positionAccessor.componentType !== 5126 ||
+      positionAccessor.type !== "VEC3" ||
+      positionAccessor.count < 7) {
+    throw new TypeError("fixture needs at least seven float32 VEC3 positions");
+  }
+  if (!indexAccessor ||
+      !view ||
+      indexAccessor.componentType !== 5123 ||
+      indexAccessor.type !== "SCALAR") {
+    throw new TypeError("fixture needs an embedded uint16 SCALAR index accessor");
+  }
+
+  // The first two triangles already use edge (0, 2). Replacing triangle 2
+  // with (0, 2, 6) makes that same edge appear a third time without
+  // introducing a repeated index in the injected triangle.
+  const triangleIndex = 2;
+  const triangleOffset = triangleIndex * 3;
+  if (triangleOffset + 2 >= indexAccessor.count) {
+    throw new RangeError("non-manifold defect triangle is outside the index accessor");
+  }
+  const first = (view.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0) + triangleOffset * 2;
+  if (!Number.isSafeInteger(first) || first < 0 || first + 6 > binary.length) {
+    throw new RangeError("non-manifold defect indices exceed the binary chunk");
+  }
+  binary.writeUInt16LE(0, first);
+  binary.writeUInt16LE(2, first + 2);
+  binary.writeUInt16LE(6, first + 4);
+  return encodeGlb(gltf, binary);
+}
+
+
+/**
+ * Remove one triangle from the closed cuboid to create exactly three open
+ * boundary edges without making the GLB structurally invalid.
+ */
+export function injectOpenBoundaryDefect(glb, { triangleIndex = 0 } = {}) {
+  if (!Number.isSafeInteger(triangleIndex) || triangleIndex < 0) {
+    throw new RangeError("triangleIndex must be a non-negative integer");
+  }
+  const { gltf, binary } = splitGlb(glb);
+  const primitive = gltf.meshes?.[0]?.primitives?.[0];
+  const indexAccessor = gltf.accessors?.[primitive?.indices];
+  const view = gltf.bufferViews?.[indexAccessor?.bufferView];
+  if (!indexAccessor || !view ||
+      indexAccessor.componentType !== 5123 ||
+      indexAccessor.type !== "SCALAR") {
+    throw new TypeError("fixture needs an embedded uint16 SCALAR index accessor");
+  }
+  const triangleOffset = triangleIndex * 3;
+  if (triangleOffset + 2 >= indexAccessor.count) {
+    throw new RangeError("triangleIndex is outside the index accessor");
+  }
+  const first = (view.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0) + triangleOffset * 2;
+  if (!Number.isSafeInteger(first) || first < 0 || first + 6 > binary.length) {
+    throw new RangeError("open-boundary triangle indices exceed the binary chunk");
+  }
+  const viewEnd = (view.byteOffset ?? 0) + view.byteLength;
+  if (viewEnd !== binary.length || first < (view.byteOffset ?? 0)) {
+    throw new TypeError("fixture index buffer must occupy the final GLB binary range");
+  }
+  const nextBinary = Buffer.concat([binary.subarray(0, first), binary.subarray(first + 6)]);
+  indexAccessor.count -= 3;
+  view.byteLength -= 6;
+  return encodeGlb(gltf, nextBinary);
+}
+
+/**
+ * Replace one cuboid triangle with a separate, non-degenerate triangle whose
+ * three vertices are appended to the same primitive. This creates a detached
+ * one-triangle component while preserving a parseable GLB and index range.
+ */
+export function injectDisconnectedComponentDefect(glb, { triangleIndex = 11 } = {}) {
+  if (!Number.isSafeInteger(triangleIndex) || triangleIndex < 0) {
+    throw new RangeError("triangleIndex must be a non-negative integer");
+  }
+  const { gltf, binary } = splitGlb(glb);
+  const primitive = gltf.meshes?.[0]?.primitives?.[0];
+  const positionAccessor = gltf.accessors?.[primitive?.attributes?.POSITION];
+  const indexAccessor = gltf.accessors?.[primitive?.indices];
+  const positionView = gltf.bufferViews?.[positionAccessor?.bufferView];
+  const indexView = gltf.bufferViews?.[indexAccessor?.bufferView];
+  if (!positionAccessor || !positionView ||
+      positionAccessor.componentType !== 5126 ||
+      positionAccessor.type !== "VEC3" ||
+      !Array.isArray(positionAccessor.max) ||
+      positionAccessor.max.length !== 3) {
+    throw new TypeError("fixture needs an embedded float32 VEC3 POSITION accessor with bounds");
+  }
+  if (!indexAccessor || !indexView ||
+      indexAccessor.componentType !== 5123 ||
+      indexAccessor.type !== "SCALAR") {
+    throw new TypeError("fixture needs an embedded uint16 SCALAR index accessor");
+  }
+  const triangleOffset = triangleIndex * 3;
+  if (triangleOffset + 2 >= indexAccessor.count) {
+    throw new RangeError("triangleIndex is outside the index accessor");
+  }
+
+  const positionStart = positionView.byteOffset ?? 0;
+  const positionEnd = positionStart + positionView.byteLength;
+  const indexStart = indexView.byteOffset ?? 0;
+  if (positionStart !== 0 || positionEnd !== indexStart ||
+      indexStart > binary.length || indexStart + indexView.byteLength !== binary.length) {
+    throw new TypeError("fixture POSITION and index buffers must be contiguous and ordered");
+  }
+
+  const firstDetachedIndex = positionAccessor.count;
+  if (firstDetachedIndex + 2 > 65535) {
+    throw new RangeError("fixture detached vertices exceed uint16 index capacity");
+  }
+  const [maxX, maxY, maxZ] = positionAccessor.max;
+  const detachedPositions = [
+    maxX + 2, maxY + 2, maxZ + 2,
+    maxX + 3, maxY + 2, maxZ + 2,
+    maxX + 2, maxY + 3, maxZ + 2,
+  ];
+  const detachedBytes = Buffer.alloc(detachedPositions.length * 4);
+  detachedPositions.forEach((value, index) => detachedBytes.writeFloatLE(value, index * 4));
+  const nextBinary = Buffer.concat([
+    binary.subarray(0, indexStart),
+    detachedBytes,
+    binary.subarray(indexStart),
+  ]);
+
+  positionAccessor.count += 3;
+  positionAccessor.max = [maxX + 3, maxY + 3, maxZ + 2];
+  positionView.byteLength += detachedBytes.length;
+  indexView.byteOffset = indexStart + detachedBytes.length;
+  indexAccessor.max = [firstDetachedIndex + 2];
+
+  const first = indexView.byteOffset + (indexAccessor.byteOffset ?? 0) + triangleOffset * 2;
+  if (!Number.isSafeInteger(first) || first < 0 || first + 6 > nextBinary.length) {
+    throw new RangeError("detached-component triangle indices exceed the binary chunk");
+  }
+  nextBinary.writeUInt16LE(firstDetachedIndex, first);
+  nextBinary.writeUInt16LE(firstDetachedIndex + 1, first + 2);
+  nextBinary.writeUInt16LE(firstDetachedIndex + 2, first + 4);
+  return encodeGlb(gltf, nextBinary);
+}

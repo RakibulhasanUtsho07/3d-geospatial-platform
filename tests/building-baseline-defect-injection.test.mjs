@@ -8,6 +8,9 @@ import {
   buildControlledBuildingGlb,
   injectDegenerateTriangleDefect,
   injectDimensionScaleDefect,
+  injectDisconnectedComponentDefect,
+  injectNonManifoldEdgeDefect,
+  injectOpenBoundaryDefect,
 } from "./fixtures/building-baseline-glb.mjs";
 
 const baseline = JSON.parse(await readFile(
@@ -34,6 +37,13 @@ function controlledBaselinePasses(glb) {
     qa.counts.meshCount === baseline.geometryExpectations.meshCount &&
     qa.counts.triangleCount === baseline.geometryExpectations.triangleCount &&
     qa.counts.degenerateTriangleCount === baseline.geometryExpectations.degenerateTriangleCount &&
+    qa.meshDetails.every(({ topology }) =>
+      topology?.topologyAnalyzed === baseline.geometryExpectations.topology.topologyAnalyzed &&
+      topology.connectedComponentCount === baseline.geometryExpectations.topology.connectedComponentCount &&
+      topology.boundaryEdgeCount === baseline.geometryExpectations.topology.boundaryEdgeCount &&
+      topology.nonManifoldEdgeCount === baseline.geometryExpectations.topology.nonManifoldEdgeCount &&
+      topology.smallDetachedComponentCount === baseline.geometryExpectations.topology.smallDetachedComponentCount
+    ) &&
     dimensions.status === "dimension-check-passed-review-required";
 }
 
@@ -44,6 +54,11 @@ test("controlled baseline matches its declared synthetic dimensions and geometry
   assert.equal(qa.counts.meshCount, baseline.geometryExpectations.meshCount);
   assert.equal(qa.counts.triangleCount, baseline.geometryExpectations.triangleCount);
   assert.equal(qa.counts.degenerateTriangleCount, 0);
+  assert.equal(qa.meshDetails[0].topology.topologyAnalyzed, true);
+  assert.equal(qa.meshDetails[0].topology.connectedComponentCount, baseline.geometryExpectations.topology.connectedComponentCount);
+  assert.equal(qa.meshDetails[0].topology.boundaryEdgeCount, baseline.geometryExpectations.topology.boundaryEdgeCount);
+  assert.equal(qa.meshDetails[0].topology.nonManifoldEdgeCount, baseline.geometryExpectations.topology.nonManifoldEdgeCount);
+  assert.equal(qa.meshDetails[0].topology.smallDetachedComponentCount, 0);
   assert.deepEqual(
     { x: qa.bounds.dimensions[0], y: qa.bounds.dimensions[1], z: qa.bounds.dimensions[2] },
     baseline.expectedDimensionsM,
@@ -84,6 +99,49 @@ test("deliberately degenerate triangle remains detectable even when the GLB pars
   assert.equal(qa.valid, true, "structural validity must not be confused with geometry quality");
   assert.ok(qa.counts.degenerateTriangleCount >= defect.expectedMinimumDegenerateTriangleCount);
   assert.ok(qa.warnings.includes(defect.expectedWarning));
+  assert.equal(controlledBaselinePasses(glb), false);
+});
+
+test("deliberately non-manifold shared edge is detected independently of GLB structural validity", () => {
+  const defect = baseline.defectCases.find((item) => item.id === "non-manifold-shared-edge");
+  const glb = injectNonManifoldEdgeDefect(cleanGlb);
+  const qa = analyzeGlbQuality(glb);
+  const topology = qa.meshDetails[0]?.topology;
+  assert.equal(qa.valid, true, "topology defects can remain structurally valid GLBs");
+  assert.equal(qa.counts.degenerateTriangleCount, 0, "the injected triangle must remain non-degenerate");
+  assert.equal(topology?.topologyAnalyzed, true);
+  assert.ok(topology.nonManifoldEdgeCount >= defect.expectedMinimumNonManifoldEdgeCount);
+  assert.ok(qa.warnings.includes(defect.expectedWarning));
+  assert.equal(controlledBaselinePasses(glb), false);
+});
+
+
+test("deliberately open boundary edges are reported on a structurally valid GLB", () => {
+  const defect = baseline.defectCases.find((item) => item.id === "open-boundary-edge");
+  const glb = injectOpenBoundaryDefect(cleanGlb, defect.injection);
+  const qa = analyzeGlbQuality(glb);
+  const topology = qa.meshDetails[0]?.topology;
+  assert.equal(qa.valid, true, "an open mesh can remain a structurally valid GLB");
+  assert.equal(qa.counts.triangleCount, defect.expectedTriangleCount);
+  assert.equal(qa.counts.degenerateTriangleCount, 0);
+  assert.equal(topology?.topologyAnalyzed, true);
+  assert.ok(topology.boundaryEdgeCount >= defect.expectedMinimumBoundaryEdgeCount);
+  assert.ok(qa.warnings.includes(defect.expectedWarning));
+  assert.equal(controlledBaselinePasses(glb), false);
+});
+
+test("a detached triangle is reported as a disconnected small mesh component", () => {
+  const defect = baseline.defectCases.find((item) => item.id === "disconnected-small-component");
+  const glb = injectDisconnectedComponentDefect(cleanGlb, defect.injection);
+  const qa = analyzeGlbQuality(glb);
+  const topology = qa.meshDetails[0]?.topology;
+  assert.equal(qa.valid, true, "disconnected components can remain structurally valid GLBs");
+  assert.equal(qa.counts.triangleCount, defect.expectedTriangleCount);
+  assert.equal(qa.counts.degenerateTriangleCount, 0);
+  assert.equal(topology?.topologyAnalyzed, true);
+  assert.ok(topology.connectedComponentCount >= defect.expectedMinimumConnectedComponentCount);
+  assert.ok(topology.smallDetachedComponentCount >= defect.expectedMinimumSmallDetachedComponentCount);
+  for (const warning of defect.expectedWarnings) assert.ok(qa.warnings.includes(warning));
   assert.equal(controlledBaselinePasses(glb), false);
 });
 

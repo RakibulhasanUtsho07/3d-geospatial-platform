@@ -85,6 +85,15 @@ on:
       - integration/brf14-main-refresh-20261103
       - integration/p37-floorplan-refresh-20261103
       - integration/p34-main-after-p37-20261103
+      - feat/brf04-open-boundary-disconnected-regressions-20261107
+      - feat/glb-qa-ignore-unreferenced-vertices-20261107
+      - feat/glb-qa-scene-transformed-bounds-20261107
+      - feat/glb-qa-sparse-accessors-20261107
+      - feat/glb-qa-position-accessor-bounds-20261107
+      - feat/glb-qa-nontriangle-position-bounds-20261107
+      - feat/glb-qa-primitive-mode-enum-20261107
+      - feat/glb-qa-index-count-limit-20261107
+      - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
   workflow_dispatch:
   pull_request:
@@ -138,6 +147,16 @@ on:
       - feat/brf46-source-operation-scope-gate
       - development
       - feat/d3m02-generation-job-map-publish-20261101
+      - feat/brf04-topology-defect-regression-20261103
+      - feat/brf04-open-boundary-disconnected-regressions-20261107
+      - feat/glb-qa-ignore-unreferenced-vertices-20261107
+      - feat/glb-qa-scene-transformed-bounds-20261107
+      - feat/glb-qa-sparse-accessors-20261107
+      - feat/glb-qa-position-accessor-bounds-20261107
+      - feat/glb-qa-nontriangle-position-bounds-20261107
+      - feat/glb-qa-primitive-mode-enum-20261107
+      - feat/glb-qa-index-count-limit-20261107
+      - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
       - feat/d3m01g-registry-preflight-20261031
       - feat/d3m01c-candidate-evidence-handoff-20261030
