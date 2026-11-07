@@ -172,6 +172,26 @@ test("D3M-29 rejects a challenge/provider-context substitution", () => {
   assert.ok(report.errors.some((item) => item.code === "challenge-provider-context"));
 });
 
+
+test("D3M-29 rejects a witness bound to another provider process-report digest or revision", () => {
+  const value = fixture();
+  const changed = {
+    ...value.witness,
+    providerProcessReportSha256: "8".repeat(64),
+    providerFinalRevision: value.witness.providerFinalRevision + 1,
+  };
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: Buffer.from(canonicalJson(changed) + "\\n", "utf8"),
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "provider-identity-binding"));
+});
+
 test("D3M-29 rejects tampering with exact challenge bytes", () => {
   const value = fixture();
   const altered = Buffer.from(value.bytes.toString("utf8").replace(context.providerId, "altered-provider"), "utf8");
