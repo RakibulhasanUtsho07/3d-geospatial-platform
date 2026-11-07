@@ -109,7 +109,7 @@ test("validates dense POSITION values after sparse replacements are applied",()=
  assert.deepEqual(overridden.bounds.min,[0,0,0]);
  assert.deepEqual(overridden.bounds.max,[1,1,0]);
  assert.equal(overridden.counts.degenerateTriangleCount,0);
- assert.throws(()=>analyzeGlbQuality(makeOverlay(0)),/non-finite vertex coordinate at vertex 0/);
+ assert.throws(()=>analyzeGlbQuality(makeOverlay(0)),/non-finite coordinate at vertex 0/);
 });
 
 test("supports zero-initialized POSITION accessors without a base bufferView",()=>{

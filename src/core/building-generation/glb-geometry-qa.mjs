@@ -130,7 +130,7 @@ function readPositions(accessor,views,binary,bufferLength,label,maxVertices,maxS
  for(let i=0;i<data.count;i++){
   const offset=i*3;
   if(!finite(positions[offset])||!finite(positions[offset+1])||!finite(positions[offset+2])){
-   throw new TypeError(label+" contains a non-finite vertex coordinate at vertex "+i);
+   throw new TypeError(label+" contains a non-finite coordinate at vertex "+i);
   }
  }
  return positions;
