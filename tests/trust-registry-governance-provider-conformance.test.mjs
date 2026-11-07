@@ -110,7 +110,7 @@ test("provider conformance suite rejects a successful CAS without advancing its 
     runTrustRegistryGovernanceProviderConformance({
       ...syntheticProvider({ reuseVersionOnWrite: true }),
     }),
-    /successful compare-and-set must advance the provider version token/i,
+    /successful compare-and-set must not reuse any prior provider version token/i,
   );
 });
 
