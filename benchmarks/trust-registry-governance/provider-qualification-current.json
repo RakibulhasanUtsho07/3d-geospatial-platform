@@ -44,7 +44,9 @@
     "runUrl": null,
     "headSha": null,
     "suiteConclusion": "not-run",
-    "syntheticOnly": true
+    "syntheticOnly": true,
+    "providerInstanceFingerprintSha256": null,
+    "providerNamespaceFingerprintSha256": null
   },
   "artifacts": [],
   "evidence": {
