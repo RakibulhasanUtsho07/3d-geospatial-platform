@@ -292,7 +292,10 @@
     "validate:trust-registry-governance-provider-qualification": "node scripts/validate-trust-registry-governance-provider-qualification.mjs",
     "test:trust-registry-governance-provider-process-conformance": "node --test tests/trust-registry-governance-provider-process-conformance.test.mjs",
     "run:trust-registry-governance-provider-process-conformance": "node scripts/run-trust-registry-governance-provider-process-conformance.mjs",
-    "test:trust-registry-governance-provider-process-report": "node --test tests/trust-registry-governance-provider-process-report.test.mjs"
+    "test:trust-registry-governance-provider-process-report": "node --test tests/trust-registry-governance-provider-process-report.test.mjs",
+    "test:trust-registry-governance-provider-anchor-witness": "node --test tests/trust-registry-governance-provider-anchor-witness.test.mjs",
+    "create:trust-registry-governance-provider-anchor-challenge": "node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs",
+    "verify:trust-registry-governance-provider-anchor-witness": "node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
