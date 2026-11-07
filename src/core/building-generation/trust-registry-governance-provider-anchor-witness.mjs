@@ -102,6 +102,10 @@ function normalizeContext(context) {
     "providerProcessReportSha256", "providerFinalRevision", "providerFinalMinimumAcceptedSequence",
   ], "provider challenge context");
   if (typeof context.syntheticOnly !== "boolean") throw new TypeError("syntheticOnly must be boolean");
+  if (!Number.isSafeInteger(context.providerFinalRevision) || context.providerFinalRevision < 1 ||
+      !Number.isSafeInteger(context.providerFinalMinimumAcceptedSequence) || context.providerFinalMinimumAcceptedSequence < 1) {
+    throw new TypeError("provider process-report revision and minimum accepted sequence must be positive safe integers");
+  }
   return Object.freeze({
     sourceCommitSha: safeCommit(context.sourceCommitSha, "sourceCommitSha"),
     providerId: safeId(context.providerId, "providerId"),
@@ -113,10 +117,6 @@ function normalizeContext(context) {
     providerFinalRevision: context.providerFinalRevision,
     providerFinalMinimumAcceptedSequence: context.providerFinalMinimumAcceptedSequence,
   });
-  if (!Number.isSafeInteger(context.providerFinalRevision) || context.providerFinalRevision < 1 ||
-      !Number.isSafeInteger(context.providerFinalMinimumAcceptedSequence) || context.providerFinalMinimumAcceptedSequence < 1) {
-    throw new TypeError("provider process-report revision and minimum accepted sequence must be positive safe integers");
-  }
 }
 
 /**
