@@ -503,3 +503,84 @@ test("audits generated facade openings for degenerate and non-manifold triangles
  }
 });
 
+
+
+function rectangularRoofSpec({ roofType = "gable", rotationDegrees = 0, reverseWinding = false } = {}) {
+ const latitude=fixture.location.latitude,longitude=fixture.location.longitude;
+ const radius=6378137,cosLat=Math.cos(latitude*Math.PI/180),rotation=rotationDegrees*Math.PI/180;
+ const width=24,depth=12;
+ let corners=[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]];
+ corners=corners.map(([x,z])=>{
+  const rx=x*Math.cos(rotation)-z*Math.sin(rotation);
+  const rz=x*Math.sin(rotation)+z*Math.cos(rotation);
+  return [
+   longitude+rx/(radius*cosLat)*180/Math.PI,
+   latitude+rz/radius*180/Math.PI
+  ];
+ });
+ if(reverseWinding)corners=[corners[0],...corners.slice(1).reverse()];
+ return {
+  ...fixture,
+  footprint:{type:"Polygon",coordinates:[[...corners,corners[0]]]},
+  architecture:{...fixture.architecture,roofType}
+ };
+}
+
+test("publishes explicit gable and hip roof types in the BuildingSpec schema",()=>{
+ assert.deepEqual(buildingSpecSchema.properties.architecture.properties.roofType.enum,["flat","terrace","pitched","gable","hip"]);
+ for(const roofType of ["gable","hip","pitched"]){
+  assert.equal(normalizeBuildingSpec(rectangularRoofSpec({roofType})).spec.architecture.roofType,roofType);
+ }
+ assert.throws(()=>normalizeBuildingSpec({...fixture,architecture:{...fixture.architecture,roofType:"mansard"}}),/unsupported roofType/);
+});
+
+test("generates true gable and hip roofs for rotated rectangular footprints in both windings",()=>{
+ for(const roofType of ["gable","hip","pitched"]){
+  for(const rotationDegrees of [0,31]){
+   for(const reverseWinding of [false,true]){
+    const spec=rectangularRoofSpec({roofType,rotationDegrees,reverseWinding});
+    const result=generateProceduralGlb(spec);
+    const roofVertices=extractMeshPositions(result.glb,"-roof");
+    const expectedGeneratedType=roofType==="hip"?"hip":"gable";
+    const expectedRise=Math.min(2.5,Math.max(0.5,result.report.geometry.floorCount*spec.dimensions.floorHeightM*0.15));
+    const expectedPeak=result.report.roof.eaveHeightM+expectedRise;
+    assert.equal(result.report.roof.generatedType,expectedGeneratedType);
+    assert.equal(result.report.roof.rectangularFootprint,true);
+    assert.equal(result.report.roof.reviewRequired,true);
+    assert.ok(Math.abs(result.report.roof.ridgeRiseM-expectedRise)<1e-6);
+    assert.ok(Math.abs(result.report.output.heightM-expectedPeak)<0.01);
+    assert.ok(roofVertices.some(point=>Math.abs(point.y-expectedPeak)<0.01),"roof ridge/apex reaches the computed peak");
+    assert.ok(result.report.reviewRequired,"procedural pitch remains review-required");
+    assert.ok(!result.report.warnings.some(message=>message.includes("flat roof cap was generated")));
+    const qa=analyzeGlbQuality(result.glb);
+    assert.equal(qa.valid,true);
+    assert.equal(qa.counts.degenerateTriangleCount,0,"pitched geometry must not emit degenerate triangles");
+   }
+  }
+ }
+});
+
+test("maps the generic pitched option to a reviewable gable roof and records the actual form",()=>{
+ const result=generateProceduralGlb(rectangularRoofSpec({roofType:"pitched"}));
+ const gltf=parseGlb(result.glb);
+ assert.equal(result.report.roof.requestedType,"pitched");
+ assert.equal(result.report.roof.generatedType,"gable");
+ assert.equal(gltf.extras.building.roofType,"pitched");
+ assert.equal(gltf.extras.building.generatedRoofType,"gable");
+ assert.ok(result.report.warnings.some(message=>message.includes("generic pitched roof option")));
+});
+
+test("falls back safely to a flat cap when gable/hip geometry is requested for a non-rectangular footprint",()=>{
+ const spec={...fixture,architecture:{...fixture.architecture,roofType:"hip"}};
+ const ring=spec.footprint.coordinates[0].slice(0,3);
+ spec.footprint={...spec.footprint,coordinates:[[...ring,ring[0]]]};
+ const result=generateProceduralGlb(spec);
+ assert.equal(result.report.roof.requestedType,"hip");
+ assert.equal(result.report.roof.generatedType,"flat");
+ assert.equal(result.report.roof.rectangularFootprint,false);
+ assert.equal(result.report.roof.ridgeRiseM,0);
+ assert.ok(result.report.warnings.some(message=>message.includes("requires a measured rectangular footprint")));
+ const qa=analyzeGlbQuality(result.glb);
+ assert.equal(qa.valid,true);
+ assert.equal(qa.counts.degenerateTriangleCount,0);
+});
