@@ -299,6 +299,11 @@ export async function runTripoImageGeneration(options = {}) {
       if (attempt + 1 < maxPollAttempts) await waitForPoll(pollIntervalMs, options.signal);
     }
     if (task?.status !== "success") throw new Error("Tripo task did not complete within the configured polling limit.");
+    const expectedTaskType = images.length === 1 ? "image_to_model" : "multiview_to_model";
+    if (task.type !== expectedTaskType) {
+      throw new TypeError("Tripo task type mismatch: expected " + expectedTaskType + " but received " + cleanMessage(task.type, 80) + ".");
+    }
+    report.taskType = task.type;
     if (typeof task.output?.model_url !== "string") throw new TypeError("Successful Tripo task did not contain output.model_url.");
     const modelBytes = await client.downloadModel({
       modelUrl: task.output.model_url,
