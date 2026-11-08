@@ -2,10 +2,11 @@ import { planGeneration, generateBuildingModel } from "./generation-engine.mjs";
 import { runColmapReconstruction } from "./colmap-worker.mjs";
 import { runSingleImage3D } from "./single-image-3d-worker.mjs";
 import { runTripoTextGeneration } from "./tripo-v3-text-generation.mjs";
+import { runTripoImageGeneration } from "./tripo-v3-image-generation.mjs";
 
 export async function generateBuildingAsset(rawSpec, options = {}) {
   const strategy = options.strategy ?? "auto";
-  if (!["auto", "procedural", "photogrammetry", "single-image-ai", "tripo-text"].includes(strategy)) throw new TypeError("strategy must be auto, procedural, photogrammetry, single-image-ai or tripo-text");
+  if (!["auto", "procedural", "photogrammetry", "single-image-ai", "tripo-text", "tripo-image"].includes(strategy)) throw new TypeError("strategy must be auto, procedural, photogrammetry, single-image-ai, tripo-text or tripo-image");
   const plan = planGeneration(rawSpec);
   const shouldRunPhotogrammetry = strategy === "photogrammetry" || (strategy === "auto" && options.enablePhotogrammetry === true && plan.sourceRoute === "multiview-photogrammetry-candidate");
   const selectedViews = options.reconstruction?.sourceIds;
@@ -19,6 +20,10 @@ export async function generateBuildingAsset(rawSpec, options = {}) {
   if (strategy === "single-image-ai") {
     const result = await runSingleImage3D({ ...options.singleImage, buildingId: plan.buildingId, buildingSpec: rawSpec });
     return { mode: "single-image-ai", plan, ...result, warning: "This is an AI-proposed single-view mesh. Hidden surfaces, metric scale and WGS84 placement are unknown; it is not map-ready." };
+  }
+  if (strategy === "tripo-image") {
+    const result = await runTripoImageGeneration({ ...options.tripoImage, buildingId: plan.buildingId, buildingSpec: rawSpec });
+    return { mode: "tripo-image-ai", plan, ...result, warning: "This paid external-provider image/multiview output is an AI-proposed visual candidate; unseen geometry, metric scale, georeference and north alignment remain unverified." };
   }
   if (strategy === "tripo-text") {
     const result = await runTripoTextGeneration({ ...options.tripo, buildingId: plan.buildingId, buildingSpec: rawSpec });
