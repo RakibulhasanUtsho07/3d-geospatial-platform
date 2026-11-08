@@ -183,6 +183,7 @@ export async function runTripoImageGeneration(options = {}) {
   if (!inside(workspaceRoot, engineRoot)) throw new TypeError("building engine directory resolves outside workspaceRoot.");
   const mediaRootCandidate = path.join(engineRoot, "media", buildingId);
   const mediaRoot = await realpath(mediaRootCandidate);
+  if (!inside(engineRoot, mediaRoot)) throw new TypeError("building media directory resolves outside the engine root.");
   const sourceRoot = await realpath(path.join(mediaRoot, "sources"));
   const assetRoot = await realpath(path.join(mediaRoot, "assets"));
   if (!inside(mediaRoot, sourceRoot) || !inside(mediaRoot, assetRoot)) throw new TypeError("source/asset directory escapes the building media store.");
