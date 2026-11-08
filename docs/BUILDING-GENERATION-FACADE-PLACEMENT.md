@@ -65,6 +65,19 @@ The focused BuildingSpec/generator tests cover:
 The repository's existing `test:building-generation` CI script runs this regression suite. A passing test establishes the tested synthetic placement behavior only. It does not prove a real building's facade bearing, dimensions, orientation, architecture, image-to-model reconstruction, surveyed georeference or publication readiness. Non-verified facade selection keeps review required; `mapReady`, `publicationEligible` and `automaticApproval` remain fail-closed.
 
 
+## Configurable arched window and door profiles
+
+BuildingSpec accepts optional facade opening shape selectors:
+
+- `architecture.windows.shape`: `rectangular` (default) or `arched`;
+- `architecture.doorShape`: `rectangular` (default) or `arched`.
+
+The existing per-edge/per-storey wall-shell builder remains the owner of the structural cut. For an arched opening, it uses the same bounded 16-segment crown profile for the front/back wall faces and reveal surfaces. The GLB generator creates a corresponding curved glass/door insert and an extruded frame surround with a separate inner contour; it does not replace the current wall-shell implementation with a parallel facade generator.
+
+The selectors are geometric style inputs, not measured evidence. Generated opening dimensions and locations remain `estimated`, keep `reviewRequired=true`, and cannot satisfy survey, visual-acceptance or publication gates. Legacy specs that omit either selector continue to normalize to rectangular openings.
+
+The `test:building-generation` suite validates schema/normalization compatibility, arched door and window cut-through behavior, preservation of the wall above each curved crown, both footprint windings, and GLB degenerate/non-manifold topology checks. CI success proves only these synthetic generator invariants; it does not establish architectural accuracy for a real building.
+
 ## GLB orientation metadata and Blender review camera
 
 The generator writes the same `facadeOrientation` object to GLB extras and the generation report. Its versioned record includes the coordinate frame, selection method, edge index, requested/actual azimuth, outward normal, confidence, selector source and review-required flag.
