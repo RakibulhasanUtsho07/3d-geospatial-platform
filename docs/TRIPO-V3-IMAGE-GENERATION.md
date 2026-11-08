@@ -45,6 +45,7 @@ await runMediaToModelWorkflow({
   viewSourceIds: ["front-photo"],
   confirmRights: true,
   confirmExternalProviderProcessing: true,
+  confirmSameBuilding: true,
   allowPaidProviderGeneration: true
 });
 ```
@@ -53,7 +54,7 @@ This invokes `POST /v3/generation/image-to-model`.
 
 ## Labelled multi-view
 
-Select two to four actual views of the same physical building. The front view is mandatory and every selected source must be labelled exactly once using `viewLabels`:
+Select two to four actual views of the same physical building. The front view is mandatory, every selected source must be labelled exactly once using `viewLabels`, and `confirmSameBuilding: true` is required after the operator verifies that the photos show the same building:
 
 ```js
 viewSourceIds: ["front-photo", "left-photo", "rear-photo"],
