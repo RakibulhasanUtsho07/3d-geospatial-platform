@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - feat/bangabhaban-front-axis-dome-center-20261108
     paths:
       - ".github/workflows/bangabhaban-model-candidate.yml"
       - "src/core/building-generation/building-spec.mjs"
