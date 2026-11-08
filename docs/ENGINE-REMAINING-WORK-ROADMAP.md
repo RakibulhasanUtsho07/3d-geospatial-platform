@@ -843,3 +843,14 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - **Post-merge Main validation:** PR #409 push CI, BRF-35 and BRF-45 checks all passed on the exact merge SHA `0df5de366e6d2b732203f075f58de663bcf14b9d`.
 - **Operational release gates remain separate:** real TripoSR/COLMAP inference, worker/cache provisioning, source-file rights, independently surveyed dimensions/control points, actual trusted reviewer/provider/anchor custody and human visual review are not provided by CI fixture success. Do not enable `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` or `automaticApproval` without that evidence.
 
+## 2026-11-08 — Configurable facade opening-profile candidate
+
+- **Current Main base:** `64081a407d8726c2c16f54cc272ccc659d0166b5` (PR #410 squash merge).
+- **Candidate branch:** `feat/configurable-facade-opening-profiles-20261108`, created directly from that Main commit; no historical stacked branch was merged.
+- **Gap addressed:** the Main generator already cuts rectangular windows/doors and curved front-arcade openings, but the BuildingSpec previously had no general selector for arched windows or an arched entrance door. PR #350 contains a broader, older facade-generator refactor; importing it wholesale would replace newer Main behavior and duplicate the current structural wall-shell implementation.
+- **Compatible port:** BuildingSpec now defaults `architecture.windows.shape` and `architecture.doorShape` to `rectangular`, validates `rectangular|arched`, and publishes the same choices in `building-generation-spec.schema.json`. The current `addWallWithOpenings` remains the structural wall-cut owner; the imported reusable profile geometry is used only for arched glass/door inserts and frame surrounds. The current +X=east / +Y=up / +Z=north coordinate frame is unchanged.
+- **Regression coverage:** existing `test:building-generation` suite adds schema/default/invalid-input checks and tests arched door/window through-cuts, wall retention above each crown, both footprint windings and GLB degenerate/non-manifold topology.
+- **Documentation:** `docs/BUILDING-GENERATION-FACADE-PLACEMENT.md` records the input contract, geometry ownership and evidence limitations.
+- **Validation status:** implementation is committed on the candidate branch. Pull-request exact-head Full CI and production renderer/viewport checks must complete successfully before merge; do not treat the older PR #350 run as validation of this port.
+- **Acceptance boundary:** opening positions/dimensions are still procedural estimates with `reviewRequired=true`. No source-image inference, survey accuracy, human visual approval or publication eligibility is created by adding shape controls.
+
