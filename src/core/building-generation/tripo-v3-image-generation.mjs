@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 import {
   createTripoV3Client,
