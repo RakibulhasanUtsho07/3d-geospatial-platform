@@ -270,7 +270,7 @@ export function createTripoV3Client({ apiKey, fetchImpl = fetch, model = TRIPO_V
       textureQuality = "detailed",
       signal,
     } = {}) {
-      if (!isRecord(views)) throw new TypeError("views must map front/left/back/right to uploaded provider file tokens.");
+      if (!views || typeof views !== "object" || Array.isArray(views)) throw new TypeError("views must map front/left/back/right to uploaded provider file tokens.");
       const allowedViews = ["front", "left", "back", "right"];
       const keys = Object.keys(views);
       if (keys.some(key => !allowedViews.includes(key))) throw new TypeError("views contains an unsupported view label.");
