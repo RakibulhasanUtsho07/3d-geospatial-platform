@@ -503,3 +503,74 @@ test("audits generated facade openings for degenerate and non-manifold triangles
  }
 });
 
+
+function roofSpec(roofType, overrides = {}) {
+  return {
+    ...fixture,
+    dimensions: { ...fixture.dimensions, parapetHeightM: 0.4 },
+    architecture: {
+      ...fixture.architecture,
+      roofType,
+      roofRiseM: 2,
+      ...overrides.architecture,
+    },
+    footprint: overrides.footprint ?? fixture.footprint,
+  };
+}
+
+test("generates gable and hip roof geometry with explicit metric rise and structural QA", () => {
+  for (const roofType of ["gable", "hip", "pitched"]) {
+    const spec = roofSpec(roofType);
+    const result = generateProceduralGlb(spec);
+    const model = parseGlb(result.glb);
+    const roofMesh = model.meshes.find(mesh => mesh.name.endsWith("-roof"));
+    assert.ok(roofMesh, roofType + " roof mesh is present");
+    const roofPositions = extractMeshPositions(result.glb, "-roof");
+    const baseY = spec.dimensions.floorCount * spec.dimensions.floorHeightM + spec.dimensions.parapetHeightM;
+    const maxY = Math.max(...roofPositions.map(point => point.y));
+    assert.ok(Math.abs(maxY - (baseY + 2)) < 0.02, roofType + " roof reaches the configured ridge rise");
+    assert.equal(result.report.geometry.roofRiseM, 2);
+    assert.equal(result.report.geometry.roofStyle, roofType === "hip" ? "hip" : "gable");
+    assert.equal(result.report.geometry.roofProfile.confidence, "estimated");
+    assert.equal(result.report.reviewRequired, true);
+    assert.ok(result.report.warnings.some(warning => warning.includes("parametric rectangular ridge profile")));
+    const qa = analyzeGlbQuality(result.glb);
+    assert.equal(qa.valid, true);
+    assert.equal(qa.counts.degenerateTriangleCount, 0);
+  }
+});
+
+test("generates a hip roof on a rotated rectangular footprint", () => {
+  const centreLon = fixture.location.longitude;
+  const centreLat = fixture.location.latitude;
+  const angle = 27 * Math.PI / 180;
+  const local = [[-10,-6],[10,-6],[10,6],[-10,6]].map(([x,z]) => [
+    centreLon + (x * Math.cos(angle) + z * Math.sin(angle)) / (6378137 * Math.cos(centreLat * Math.PI / 180)) * 180 / Math.PI,
+    centreLat + (-x * Math.sin(angle) + z * Math.cos(angle)) / 6378137 * 180 / Math.PI,
+  ]);
+  const spec = roofSpec("hip", {
+    footprint: { type: "Polygon", coordinates: [[...local, local[0]]] },
+  });
+  const result = generateProceduralGlb(spec);
+  const qa = analyzeGlbQuality(result.glb);
+  assert.equal(result.report.geometry.roofProfile.footprintShape, "rectangular");
+  assert.equal(qa.valid, true);
+  assert.equal(qa.counts.degenerateTriangleCount, 0);
+});
+
+test("rejects pitched roofs for non-rectangular footprints instead of silently emitting a flat cap", () => {
+  const coordinates = fixture.footprint.coordinates[0].map(point => [...point]);
+  coordinates[2][1] += 0.000012;
+  const spec = roofSpec("gable", {
+    footprint: { type: "Polygon", coordinates: [coordinates] },
+  });
+  assert.throws(
+    () => generateProceduralGlb(spec),
+    /Pitched roofs require a rectangular footprint|Pitched roofs require opposite footprint edges/,
+  );
+});
+
+test("validates optional roof rise and limits it to pitched roof types", () => {
+  assert.throws(() => normalizeBuildingSpec(roofSpec("gable", { architecture: { roofRiseM: 0.1 } })), /between 0.25 and 10/);
+  assert.throws(() => normalizeBuildingSpec(roofSpec("flat", { architecture: { roofRiseM: 1 } })), /only valid for pitched/);
+});
