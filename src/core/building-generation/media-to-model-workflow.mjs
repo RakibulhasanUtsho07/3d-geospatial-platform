@@ -429,6 +429,7 @@ export async function runMediaToModelWorkflow(options){
   if(!syncedSpec||!Array.isArray(viewIds))throw new TypeError("stored building-spec-sync artifact is incomplete");
   const normalizedViewLabels = effectiveStrategy==="tripo-image" ? normalizeTripoViewLabels(viewIds, options.viewLabels) : null;
   if(effectiveStrategy==="tripo-image"&&(viewIds.length<1||viewIds.length>4))throw new TypeError("tripo-image requires one image or two to four selected views");
+  if(effectiveStrategy==="tripo-image"&&viewIds.length>1&&options.confirmSameBuilding!==true)throw new TypeError("tripo-image multiview requires confirmSameBuilding=true after checking that every labelled view depicts the same physical building");
   await atomicJson(specPath,syncedSpec);
   runReport.inputs.mediaRecords=mediaRecords;
   runReport.inputs.selectedViewIds=viewIds;
@@ -503,6 +504,7 @@ export async function runMediaToModelWorkflow(options){
      },
      tripoImage:{
       workspaceRoot:root,jobId:workerJobId,sourceIds:viewIds,viewLabels:normalizedViewLabels,
+      confirmSameBuilding:options.confirmSameBuilding===true,
       allowPaidProviderGeneration:options.allowPaidProviderGeneration===true,
       confirmExternalProviderProcessing:options.confirmExternalProviderProcessing===true,
       apiKey:options.apiKey,model:config.tripoModel,texture:config.tripoTexture,pbr:config.tripoPbr,
