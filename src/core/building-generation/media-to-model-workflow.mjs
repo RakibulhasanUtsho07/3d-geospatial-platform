@@ -513,6 +513,8 @@ export async function runMediaToModelWorkflow(options){
      tripoImage:{
       workspaceRoot:root,jobId:workerJobId,sourceIds:viewIds,viewLabels:normalizedViewLabels,
       confirmSameBuilding:options.confirmSameBuilding===true,
+      generateMultiviewFromSingleImage:config.generateMultiviewFromSingleImage,
+      confirmSyntheticViewGeneration:config.confirmSyntheticViewGeneration,
       allowPaidProviderGeneration:options.allowPaidProviderGeneration===true,
       confirmExternalProviderProcessing:options.confirmExternalProviderProcessing===true,
       apiKey:options.apiKey,model:config.tripoModel,texture:config.tripoTexture,pbr:config.tripoPbr,
