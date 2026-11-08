@@ -252,7 +252,6 @@ export function createTripoV3Client({ apiKey, fetchImpl = fetch, model = TRIPO_V
           geometry_quality: geometryQuality,
           texture_quality: textureQuality,
           enable_image_autofix: enableImageAutofix,
-          auto_size: false,
         }),
       }, "Tripo image-to-model submission");
       if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
@@ -301,7 +300,6 @@ export function createTripoV3Client({ apiKey, fetchImpl = fetch, model = TRIPO_V
           pbr,
           geometry_quality: geometryQuality,
           texture_quality: textureQuality,
-          auto_size: false,
         }),
       }, "Tripo multiview-to-model submission");
       if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
