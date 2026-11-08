@@ -136,11 +136,30 @@ export function normalizeBuildingSpec(raw) {
     throw new TypeError("specify either frontFacadeEdgeIndex or frontFacingAzimuthDegrees, not both");
   }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
+  const balconyCount = balcony.count === undefined || balcony.count === null
+    ? null
+    : num(balcony.count, "balcony.count", 1, 6);
+  if (balconyCount !== null && !Number.isInteger(balconyCount)) throw new RangeError("balcony.count must be an integer");
+  let balconyFloors = null;
+  if (balcony.floors !== undefined) {
+    if (!Array.isArray(balcony.floors) || balcony.floors.length > dimensions.floorCount) {
+      throw new TypeError("balcony.floors must be an array of unique 1-based storey numbers");
+    }
+    balconyFloors = balcony.floors.map((storey, index) => {
+      const value = num(storey, "balcony.floors[" + index + "]", 2, dimensions.floorCount);
+      if (!Number.isInteger(value)) throw new RangeError("balcony.floors values must be integers");
+      return value;
+    });
+    if (new Set(balconyFloors).size !== balconyFloors.length) throw new TypeError("balcony.floors must not contain duplicates");
+    balconyFloors.sort((left, right) => left - right);
+  }
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
   const windowShape = windows.shape === undefined ? "rectangular" : str(windows.shape, "windows.shape", 20).toLowerCase();
   if (!["rectangular", "arched"].includes(windowShape)) {
     throw new TypeError("windows.shape must be 'rectangular' or 'arched'");
   }
+  const doorLeafCount = a.doorLeafCount === undefined ? 1 : num(a.doorLeafCount, "doorLeafCount", 1, 2);
+  if (!Number.isInteger(doorLeafCount)) throw new RangeError("doorLeafCount must be 1 or 2");
   const doorShape = a.doorShape === undefined ? "rectangular" : str(a.doorShape, "doorShape", 20).toLowerCase();
   if (!["rectangular", "arched"].includes(doorShape)) {
     throw new TypeError("doorShape must be 'rectangular' or 'arched'");
@@ -151,6 +170,7 @@ export function normalizeBuildingSpec(raw) {
     throw new TypeError("centralDome.anchor must be 'front-facade-inset' or 'footprint-bounds-center'");
   }
   const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
+  const columns = a.frontColumns === undefined ? {} : obj(a.frontColumns, "architecture.frontColumns");
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
     if (typeof value !== "boolean") throw new TypeError(label + " must be boolean");
@@ -169,9 +189,21 @@ export function normalizeBuildingSpec(raw) {
     doorColor: hex(a.doorColor, "#76533A", "doorColor"),
     includeDoor: bool(a.includeDoor, true, "includeDoor"),
     doorShape,
+    doorLeafCount,
+    frontColumns: {
+      enabled: bool(columns.enabled, false, "frontColumns.enabled"),
+      count: columns.count === undefined ? 0 : num(columns.count, "frontColumns.count", 0, 20),
+      widthM: columns.widthM === undefined ? 0.28 : num(columns.widthM, "frontColumns.widthM", 0.12, 1.5),
+      depthM: columns.depthM === undefined ? 0.28 : num(columns.depthM, "frontColumns.depthM", 0.12, 1.5),
+      heightM: columns.heightM === undefined || columns.heightM === null
+        ? null
+        : num(columns.heightM, "frontColumns.heightM", 2, 100)
+    },
     balcony: {
       enabled: bool(balcony.enabled, true, "balcony.enabled"),
       everyFloors: balcony.everyFloors === undefined ? 2 : num(balcony.everyFloors, "balcony.everyFloors", 1, 20),
+      count: balconyCount,
+      ...(balconyFloors === null ? {} : { floors: balconyFloors }),
       widthM: balcony.widthM === undefined ? 1.6 : num(balcony.widthM, "balcony.widthM", 0.6, 6),
       depthM: balcony.depthM === undefined ? 0.85 : num(balcony.depthM, "balcony.depthM", 0.2, 3)
     },
@@ -202,6 +234,7 @@ export function normalizeBuildingSpec(raw) {
   };
   if (!Number.isInteger(architecture.balcony.everyFloors)) throw new RangeError("balcony.everyFloors must be an integer");
   if (!Number.isInteger(architecture.frontArcade.bayCount)) throw new RangeError("frontArcade.bayCount must be an integer");
+  if (!Number.isInteger(architecture.frontColumns.count)) throw new RangeError("frontColumns.count must be an integer");
   const sources = sourcesOf(input.sources);
   const sourceIds = new Set(sources.map(s => s.id));
   const evidenceRaw = input.evidence === undefined ? [] : input.evidence;
