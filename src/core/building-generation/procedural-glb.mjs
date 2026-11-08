@@ -550,22 +550,26 @@ export function generateProceduralGlb(rawSpec) {
       const columnHeightM=Math.min(height,columnSpec.heightM??height);
       let placedCount=0,skippedCount=0;
       const doorWidthM=frontDoorPlacement?.widthM??0;
+      const placedAlong=[];
       for(let index=0;index<columnSpec.count;index++){
         const along=e.len*(index+1)/(columnSpec.count+1);
-        if(frontDoorPlacement&&Math.abs(along-e.len/2)<(doorWidthM+columnSpec.widthM)/2+0.05){
+        const conflictsWithDoor=frontDoorPlacement&&Math.abs(along-e.len/2)<(doorWidthM+columnSpec.widthM)/2+0.05;
+        const conflictsWithColumn=placedAlong.some(previous=>Math.abs(along-previous)<columnSpec.widthM+0.05);
+        if(conflictsWithDoor||conflictsWithColumn){
           skippedCount++;
           continue;
         }
         const facadePoint={x:e.p.x+(e.n.x-e.p.x)*along/e.len,z:e.p.z+(e.n.z-e.p.z)*along/e.len};
         const center=offsetFacadePoint(facadePoint,e,0,surfaceInsertCenterOffset(columnSpec.depthM,0.002));
         geo.box("concrete",center.x,columnHeightM/2,center.z,columnSpec.widthM,columnHeightM,columnSpec.depthM,e.yaw);
+        placedAlong.push(along);
         placedCount++;
       }
       frontColumnsPlacement={
         edgeIndex:front,requestedCount:columnSpec.count,placedCount,skippedCount,
         widthM:Number(columnSpec.widthM.toFixed(3)),depthM:Number(columnSpec.depthM.toFixed(3)),
         heightM:Number(columnHeightM.toFixed(3)),confidence:"estimated",source:"buildingSpec.architecture.frontColumns",
-        reviewRequired:placedCount>0
+        reviewRequired:true
       };
       if(placedCount>0)warnings.push("Front colonnade geometry is generated from operator-supplied count and dimensions; verify spacing and structural placement against reference evidence.");
       if(skippedCount>0)warnings.push("One or more front columns were omitted to preserve clearance around the main entrance.");
@@ -727,7 +731,9 @@ export function generateProceduralGlb(rawSpec) {
       frontAxisNeedsReview||
       selectedFacade.reviewRequired||
       structuralOpeningRecords.some(opening=>opening.reviewRequired)||
-      (domePlacement?.reviewRequired===true),
+      (domePlacement?.reviewRequired===true)||
+      (frontColumnsPlacement?.reviewRequired===true)||
+      balconyPlacementRecords.some(item=>item.reviewRequired),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
