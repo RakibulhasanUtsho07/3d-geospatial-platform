@@ -5,6 +5,7 @@ export const SOURCE_OPERATION_SCOPES = Object.freeze([
   "procedural-model-derivation",
   "single-image-ai-reconstruction",
   "photogrammetry-reconstruction",
+  "external-provider-image-generation",
   "texture-baking",
 ]);
 
