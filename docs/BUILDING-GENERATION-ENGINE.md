@@ -4,7 +4,7 @@ Status: deterministic procedural generation, source-aware BuildingSpec validatio
 
 ## 1. Baseline input → 3D model
 
-**building-spec.mjs** validates BuildingSpec version 1.0.0, WGS84 footprint coordinates and building dimensions, style/material/window/door/balcony parameters, source metadata and confidence-linked evidence. **procedural-glb.mjs** generates a deterministic binary glTF (.glb) with walls, repeated windows/frames, a door, front balconies, roof cap and parapet. **generation-engine.mjs** writes a JSON QA/provenance report. The synthetic fixture is for tests only.
+**building-spec.mjs** validates BuildingSpec version 1.0.0, WGS84 footprint coordinates and building dimensions, style/material/window/door/balcony parameters, source metadata and confidence-linked evidence. **procedural-glb.mjs** generates a deterministic binary glTF (.glb) with walls, repeated windows/frames, single- or double-leaf entrances, optional front columns, storey-selected balconies, terrace/flat roofs, and measured-rectangle gable/hip roof geometry. Generic `pitched` roof requests are explicitly recorded as gable roofs. Unsupported non-rectangular gable/hip footprints fail safely back to a flat cap with a warning. These parametric details remain estimated and review-required; they are not an architectural reconstruction. **generation-engine.mjs** writes a JSON QA/provenance report. The synthetic fixture is for tests only.
 
 ~~~powershell
 npm run test:building-generation
