@@ -43,6 +43,30 @@ async function requireRegularFile(filePath, label) {
   return { path: resolved, size: finalEntry.size };
 }
 
+async function pollProviderTask(client, taskId, {
+  signal,
+  pollIntervalMs,
+  maxPollAttempts,
+  onPoll = () => {},
+  stage,
+} = {}) {
+  let task = null;
+  for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
+    task = await client.queryTask({ taskId, signal });
+    onPoll(task);
+    if (task.status === "success") break;
+    if (TERMINAL_FAILURES.has(task.status)) {
+      const reason = cleanMessage(task.error_message, 500);
+      throw new Error("Tripo " + stage + " task ended with status " + task.status + (reason ? ": " + reason : "") + ".");
+    }
+    if (attempt + 1 < maxPollAttempts) await waitForPoll(pollIntervalMs, signal);
+  }
+  if (task?.status !== "success") {
+    throw new Error("Tripo " + stage + " task did not complete within the configured polling limit.");
+  }
+  return task;
+}
+
 async function waitForPoll(intervalMs, signal) {
   if (signal?.aborted) throw signal.reason ?? new Error("Tripo generation was aborted.");
   if (intervalMs === 0) return;
@@ -158,6 +182,16 @@ export async function runTripoImageGeneration(options = {}) {
   const sourceIds = options.sourceIds.map(id => safeId(id, "sourceId"));
   if (new Set(sourceIds).size !== sourceIds.length) throw new TypeError("sourceIds must not contain duplicates.");
   const viewLabels = normalizeViewLabels(sourceIds, options.viewLabels);
+  const generateMultiviewFromSingleImage = options.generateMultiviewFromSingleImage ?? false;
+  if (typeof generateMultiviewFromSingleImage !== "boolean") {
+    throw new TypeError("generateMultiviewFromSingleImage must be a boolean.");
+  }
+  if (generateMultiviewFromSingleImage && sourceIds.length !== 1) {
+    throw new TypeError("AI-synthesized multiview expansion is only available for exactly one actual source image.");
+  }
+  if (generateMultiviewFromSingleImage && options.confirmSyntheticViewGeneration !== true) {
+    throw new TypeError("confirmSyntheticViewGeneration must be true after acknowledging that Tripo will synthesize non-independent side views from one photograph.");
+  }
   if (sourceIds.length > 1 && options.confirmSameBuilding !== true) {
     throw new TypeError("confirmSameBuilding must be true after checking that every labelled view depicts the same physical building.");
   }
@@ -212,7 +246,17 @@ export async function runTripoImageGeneration(options = {}) {
     buildingId,
     jobId,
     model,
-    generationStage: images.length === 1 ? "image-to-model" : "multiview-to-model",
+    generationStage: generateMultiviewFromSingleImage
+      ? "image-to-multiview-then-multiview-to-model"
+      : images.length === 1 ? "image-to-model" : "multiview-to-model",
+    ...(generateMultiviewFromSingleImage ? {
+      syntheticViewProvenance: {
+        kind: "ai-synthesized-from-single-image",
+        sourceImageId: images[0].sourceId,
+        generatedViewsAreIndependentObservations: false,
+        eligibleAsSurveyEvidence: false,
+      },
+    } : {}),
     sameBuildingConfirmed: images.length > 1 && options.confirmSameBuilding === true,
     sources: images.map((image, index) => ({
       sourceId: image.sourceId,
@@ -236,6 +280,7 @@ export async function runTripoImageGeneration(options = {}) {
     warnings: [
       "Tripo image/multiview generation infers unseen geometry; it is not a surveyed reconstruction.",
       "A labelled multi-view task requires the selected images to show the same physical building from their declared views.",
+      ...(generateMultiviewFromSingleImage ? ["AI-synthesized side views are derived from one photograph and are not independent captures, camera calibrations or survey evidence."] : []),
       "Image pixels, model dimensions and output orientation are not independent metric or geospatial truth.",
       "Human visual review and independent dimensions/checkpoints are required before any map publication.",
       "The paid external provider receives the selected source image bytes under the user-attested licence and operation scope.",
@@ -257,7 +302,52 @@ export async function runTripoImageGeneration(options = {}) {
       uploaded.push({ sourceId: image.sourceId, fileToken: result.fileToken });
     }
     let submitted;
-    if (images.length === 1) {
+    const stageTaskIds = [];
+    if (generateMultiviewFromSingleImage) {
+      const imageViewsTask = await client.submitImageToMultiview({
+        fileToken: uploaded[0].fileToken,
+        signal: options.signal,
+      });
+      stageTaskIds.push(imageViewsTask.taskId);
+      report.stageTaskIds = [...stageTaskIds];
+      report.generationStages = ["image-to-multiview"];
+      report.status = "image-to-multiview-submitted";
+      await saveReport();
+
+      const generatedViewsTask = await pollProviderTask(client, imageViewsTask.taskId, {
+        signal: options.signal,
+        pollIntervalMs,
+        maxPollAttempts,
+        stage: "image-to-multiview",
+        onPoll: task => {
+          report.intermediateTaskStatus = task.status;
+          report.intermediateTaskProgress = Number.isFinite(task.progress) ? task.progress : null;
+        },
+      });
+      if (generatedViewsTask.type !== "image_to_multiview") {
+        throw new TypeError("Tripo image-to-multiview task type mismatch: expected image_to_multiview but received " + cleanMessage(generatedViewsTask.type, 80) + ".");
+      }
+      report.syntheticViewProvenance = {
+        ...report.syntheticViewProvenance,
+        taskId: generatedViewsTask.task_id,
+        taskType: generatedViewsTask.type,
+        outputViewsAvailable: Object.keys(generatedViewsTask.output?.generate_multiview_image ?? {}),
+        generatedViewsAreIndependentObservations: false,
+        eligibleAsSurveyEvidence: false,
+      };
+      report.generationStages.push("multiview-to-model");
+      await saveReport();
+
+      submitted = await client.submitMultiviewFromTask({
+        sourceTaskId: imageViewsTask.taskId,
+        model,
+        texture,
+        pbr,
+        geometryQuality,
+        textureQuality,
+        signal: options.signal,
+      });
+    } else if (images.length === 1) {
       submitted = await client.submitImageToModel({
         fileToken: uploaded[0].fileToken,
         model,
@@ -282,24 +372,28 @@ export async function runTripoImageGeneration(options = {}) {
         signal: options.signal,
       });
     }
+    stageTaskIds.push(submitted.taskId);
+    report.stageTaskIds = stageTaskIds;
+    report.generationStages = generateMultiviewFromSingleImage
+      ? ["image-to-multiview", "multiview-to-model"]
+      : [submitted.stage];
     report.taskId = submitted.taskId;
     report.status = "submitted";
     await saveReport();
 
-    let task = null;
-    for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
-      task = await client.queryTask({ taskId: submitted.taskId, signal: options.signal });
-      report.taskStatus = task.status;
-      report.taskProgress = Number.isFinite(task.progress) ? task.progress : null;
-      if (task.status === "success") break;
-      if (TERMINAL_FAILURES.has(task.status)) {
-        const reason = cleanMessage(task.error_message, 500);
-        throw new Error("Tripo task ended with status " + task.status + (reason ? ": " + reason : "") + ".");
-      }
-      if (attempt + 1 < maxPollAttempts) await waitForPoll(pollIntervalMs, options.signal);
-    }
-    if (task?.status !== "success") throw new Error("Tripo task did not complete within the configured polling limit.");
-    const expectedTaskType = images.length === 1 ? "image_to_model" : "multiview_to_model";
+    const expectedTaskType = images.length === 1 && !generateMultiviewFromSingleImage
+      ? "image_to_model"
+      : "multiview_to_model";
+    const task = await pollProviderTask(client, submitted.taskId, {
+      signal: options.signal,
+      pollIntervalMs,
+      maxPollAttempts,
+      stage: "model-generation",
+      onPoll: value => {
+        report.taskStatus = value.status;
+        report.taskProgress = Number.isFinite(value.progress) ? value.progress : null;
+      },
+    });
     if (task.type !== expectedTaskType) {
       throw new TypeError("Tripo task type mismatch: expected " + expectedTaskType + " but received " + cleanMessage(task.type, 80) + ".");
     }
