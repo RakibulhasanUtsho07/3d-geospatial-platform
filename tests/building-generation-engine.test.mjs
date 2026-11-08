@@ -503,3 +503,96 @@ test("audits generated facade openings for degenerate and non-manifold triangles
  }
 });
 
+
+
+test("publishes configurable entry leaves, selected balcony storeys and standalone front columns in BuildingSpec schema",()=>{
+ const architecture=buildingSpecSchema.properties.architecture.properties;
+ assert.deepEqual(architecture.doorLeafCount,{type:"integer",enum:[1,2]});
+ assert.deepEqual(architecture.frontColumns,{
+  type:"object",
+  properties:{
+   enabled:{type:"boolean"},
+   count:{type:"integer",minimum:0,maximum:20},
+   widthM:{type:"number",minimum:0.12,maximum:1.5},
+   depthM:{type:"number",minimum:0.12,maximum:1.5},
+   heightM:{type:["number","null"],minimum:2,maximum:100}
+  },
+  additionalProperties:false
+ });
+ assert.deepEqual(architecture.balcony.properties.count,{type:["integer","null"],minimum:1,maximum:6});
+ assert.deepEqual(architecture.balcony.properties.floors,{
+  type:"array",uniqueItems:true,items:{type:"integer",minimum:2,maximum:100}
+ });
+});
+
+test("normalizes and validates double-door, front-column and storey-specific balcony controls",()=>{
+ const spec=facadeTestSpec({
+  architecture:{
+   doorLeafCount:2,
+   frontColumns:{enabled:true,count:4,widthM:0.32,depthM:0.36,heightM:9},
+   balcony:{enabled:true,count:2,floors:[5,2],widthM:1.5,depthM:1}
+  }
+ });
+ const normalized=normalizeBuildingSpec(spec).spec.architecture;
+ assert.equal(normalized.doorLeafCount,2);
+ assert.deepEqual(normalized.balcony.floors,[2,5]);
+ assert.equal(normalized.balcony.count,2);
+ assert.deepEqual(normalized.frontColumns,{
+  enabled:true,count:4,widthM:0.32,depthM:0.36,heightM:9
+ });
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({architecture:{doorLeafCount:3}})),/doorLeafCount must be between 1 and 2/);
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({architecture:{balcony:{floors:[2,2]}}})),/must not contain duplicates/);
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({architecture:{balcony:{floors:[6]}}})),/balcony.floors\[0\] must be between 2 and 5/);
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({architecture:{frontColumns:{count:21}}})),/frontColumns.count must be between 0 and 20/);
+});
+
+test("creates paired door leaves and a central mullion while retaining one shared structural opening",()=>{
+ const single=generateProceduralGlb(facadeTestSpec({architecture:{doorLeafCount:1}}));
+ const double=generateProceduralGlb(facadeTestSpec({architecture:{doorLeafCount:2}}));
+ const door=double.report.structuralOpenings.find(opening=>opening.kind==="door");
+ assert.ok(door);
+ assert.equal(door.leafCount,2);
+ assert.equal(double.report.architecturePlacement.frontDoor.leafCount,2);
+ assert.equal(double.report.architecturePlacement.frontDoor.reviewRequired,true);
+ assert.ok(extractMeshPositions(double.glb,"-door").length>extractMeshPositions(single.glb,"-door").length);
+ assert.ok(extractMeshPositions(double.glb,"-frame").length>extractMeshPositions(single.glb,"-frame").length,
+  "double door includes a central frame mullion");
+ const qa=analyzeGlbQuality(double.glb);
+ assert.equal(qa.valid,true);
+ assert.equal(qa.counts.degenerateTriangleCount,0);
+});
+
+test("places standalone front columns using the selected facade and skips conflicting arcade geometry",()=>{
+ const spec=facadeTestSpec({
+  architecture:{frontColumns:{enabled:true,count:4,widthM:0.32,depthM:0.34,heightM:8}}
+ });
+ const result=generateProceduralGlb(spec);
+ const columns=result.report.architecturePlacement.frontColumns;
+ assert.ok(columns);
+ assert.equal(columns.requestedCount,4);
+ assert.equal(columns.placedCount,4);
+ assert.equal(columns.widthM,0.32);
+ assert.equal(columns.depthM,0.34);
+ assert.equal(columns.heightM,8);
+ assert.equal(columns.reviewRequired,true);
+ assert.ok(extractMeshPositions(result.glb,"-concrete").length>0);
+ assert.equal(result.report.geometry.frontColumnCount,4);
+
+ const arcade=generateProceduralGlb(facadeTestSpec({
+  architecture:{frontColumns:{enabled:true,count:4},frontArcade:{enabled:true,bayCount:3,heightM:2.8}}
+ }));
+ assert.equal(arcade.report.architecturePlacement.frontColumns.placedCount,0);
+ assert.equal(arcade.report.architecturePlacement.frontColumns.reason,"front-arcade-already-provides-columns");
+ assert.ok(arcade.report.warnings.some(message=>message.includes("already generates its own column system")));
+});
+
+test("places balconies on explicitly selected storeys and records each requested level",()=>{
+ const result=generateProceduralGlb(facadeTestSpec({
+  architecture:{balcony:{enabled:true,count:2,floors:[2,5],widthM:1.4,depthM:0.9}}
+ }));
+ const placements=result.report.architecturePlacement.balconies;
+ assert.deepEqual(placements.map(item=>item.storey),[2,5]);
+ assert.ok(placements.every(item=>item.count===2&&item.reviewRequired===true));
+ assert.equal(result.report.geometry.balconyPlacementCount,2);
+ assert.equal(result.report.reviewRequired,true);
+});
