@@ -45,12 +45,25 @@ await runMediaToModelWorkflow({
   viewSourceIds: ["front-photo"],
   confirmRights: true,
   confirmExternalProviderProcessing: true,
-  confirmSameBuilding: true,
   allowPaidProviderGeneration: true
 });
 ```
 
 This invokes `POST /v3/generation/image-to-model`.
+
+
+## Optional AI-synthesized multiview from one photograph
+
+For visual exploration only, the operator may ask Tripo to synthesize additional side views from the same one licensed photograph before the 3D model step:
+
+```js
+generateMultiviewFromSingleImage: true,
+confirmSyntheticViewGeneration: true
+```
+
+This option is off by default. Both flags are required, in addition to the paid-provider and external-processing confirmations. It triggers an extra asynchronous `image-to-multiview` provider task followed by `multiview-to-model`; the additional provider stage may consume extra credits.
+
+The workflow report labels these side views as `ai-synthesized-from-single-image`. It explicitly records `generatedViewsAreIndependentObservations: false` and `eligibleAsSurveyEvidence: false`. The synthetic views must never be described or used as separate camera captures, independent source photos, photogrammetry input, camera calibration or survey evidence. They are only an optional visual aid for a candidate model and do not establish hidden facade or metric geometry.
 
 ## Labelled multi-view
 
