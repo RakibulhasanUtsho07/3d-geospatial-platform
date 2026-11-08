@@ -9,6 +9,7 @@ export const TRIPO_V3_DEFAULT_MODEL = "v3.1-20260211";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const TASK_ID = /^[A-Za-z0-9_-]{4,200}$/;
+const FILE_TOKEN = /^file_[A-Za-z0-9_-]{4,240}$/;
 const ALLOWED_MODELS = new Set(["v3.1-20260211", "v3.0-20250812"]);
 const ALLOWED_QUALITY = new Set(["standard", "detailed"]);
 const MAX_PROMPT_LENGTH = 1024;
@@ -200,6 +201,162 @@ export function createTripoV3Client({ apiKey, fetchImpl = fetch, model = TRIPO_V
   }
 
   return Object.freeze({
+    async uploadImage({ bytes, filename = "building-reference.png", contentType = "image/png", signal } = {}) {
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+        throw new TypeError("Image bytes must be a non-empty Uint8Array.");
+      }
+      if (bytes.byteLength > 20 * 1024 * 1024) throw new RangeError("Tripo image uploads are limited to 20 MiB.");
+      if (!["image/jpeg", "image/png"].includes(contentType)) {
+        throw new TypeError("Tripo image upload accepts only JPEG or PNG.");
+      }
+      if (typeof filename !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(filename) || filename.includes("..")) {
+        throw new TypeError("Upload filename must be a safe basename.");
+      }
+      const form = new FormData();
+      form.append("file", new Blob([Uint8Array.from(bytes)], { type: contentType }), filename);
+      const data = await apiRequest("/files", { method: "POST", signal, body: form }, "Tripo image file upload");
+      if (typeof data.file_token !== "string" || !FILE_TOKEN.test(data.file_token)) {
+        throw new TypeError("Tripo file upload response did not contain a valid file_token.");
+      }
+      return Object.freeze({ fileToken: data.file_token });
+    },
+
+    async submitImageToModel({
+      fileToken,
+      model: requestedModel = model,
+      texture = true,
+      pbr = true,
+      geometryQuality = "detailed",
+      textureQuality = "detailed",
+      enableImageAutofix = false,
+      signal,
+    } = {}) {
+      if (typeof fileToken !== "string" || !FILE_TOKEN.test(fileToken)) throw new TypeError("fileToken is invalid.");
+      if (!ALLOWED_MODELS.has(requestedModel)) throw new TypeError("model is not an allowed pinned Tripo V3 model version.");
+      if (typeof texture !== "boolean" || typeof pbr !== "boolean" || typeof enableImageAutofix !== "boolean") {
+        throw new TypeError("texture, pbr and enableImageAutofix must be booleans.");
+      }
+      if (!ALLOWED_QUALITY.has(geometryQuality)) throw new TypeError("geometryQuality must be standard or detailed.");
+      if (!["standard", "detailed", "extreme"].includes(textureQuality)) {
+        throw new TypeError("textureQuality must be standard, detailed or extreme.");
+      }
+      const data = await apiRequest("/generation/image-to-model", {
+        method: "POST",
+        signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: fileToken,
+          model: requestedModel,
+          texture: texture || pbr,
+          pbr,
+          geometry_quality: geometryQuality,
+          texture_quality: textureQuality,
+          enable_image_autofix: enableImageAutofix,
+        }),
+      }, "Tripo image-to-model submission");
+      if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
+        throw new TypeError("Tripo image-to-model response did not contain a valid task_id.");
+      }
+      return Object.freeze({ taskId: data.task_id, stage: "image-to-model" });
+    },
+
+    async submitImageToMultiview({ fileToken, signal } = {}) {
+      if (typeof fileToken !== "string" || !FILE_TOKEN.test(fileToken)) throw new TypeError("fileToken is invalid.");
+      const data = await apiRequest("/generation/image-to-multiview", {
+        method: "POST",
+        signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: fileToken }),
+      }, "Tripo image-to-multiview submission");
+      if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
+        throw new TypeError("Tripo image-to-multiview response did not contain a valid task_id.");
+      }
+      return Object.freeze({ taskId: data.task_id, stage: "image-to-multiview" });
+    },
+
+    async submitMultiviewFromTask({
+      sourceTaskId,
+      model: requestedModel = model,
+      texture = true,
+      pbr = true,
+      geometryQuality = "detailed",
+      textureQuality = "detailed",
+      signal,
+    } = {}) {
+      if (typeof sourceTaskId !== "string" || !TASK_ID.test(sourceTaskId)) throw new TypeError("sourceTaskId is invalid.");
+      if (!ALLOWED_MODELS.has(requestedModel)) throw new TypeError("model is not an allowed pinned Tripo V3 model version.");
+      if (typeof texture !== "boolean" || typeof pbr !== "boolean") throw new TypeError("texture and pbr must be booleans.");
+      if (!ALLOWED_QUALITY.has(geometryQuality)) throw new TypeError("geometryQuality must be standard or detailed.");
+      if (!["standard", "detailed", "extreme"].includes(textureQuality)) {
+        throw new TypeError("textureQuality must be standard, detailed or extreme.");
+      }
+      const data = await apiRequest("/generation/multiview-to-model", {
+        method: "POST",
+        signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputs: [{ task_id: sourceTaskId }],
+          model: requestedModel,
+          texture: texture || pbr,
+          pbr,
+          geometry_quality: geometryQuality,
+          texture_quality: textureQuality,
+        }),
+      }, "Tripo multiview-from-task submission");
+      if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
+        throw new TypeError("Tripo multiview-from-task response did not contain a valid task_id.");
+      }
+      return Object.freeze({ taskId: data.task_id, stage: "multiview-to-model" });
+    },
+
+    async submitMultiviewToModel({
+      views,
+      model: requestedModel = model,
+      texture = true,
+      pbr = true,
+      geometryQuality = "detailed",
+      textureQuality = "detailed",
+      signal,
+    } = {}) {
+      if (!views || typeof views !== "object" || Array.isArray(views)) throw new TypeError("views must map front/left/back/right to uploaded provider file tokens.");
+      const allowedViews = ["front", "left", "back", "right"];
+      const keys = Object.keys(views);
+      if (keys.some(key => !allowedViews.includes(key))) throw new TypeError("views contains an unsupported view label.");
+      if (!views.front) throw new TypeError("Tripo multiview generation requires a front view.");
+      if (keys.length < 2 || keys.length > 4) throw new TypeError("Tripo multiview generation requires two to four labelled views.");
+      if (!ALLOWED_MODELS.has(requestedModel)) throw new TypeError("model is not an allowed pinned Tripo V3 model version.");
+      if (typeof texture !== "boolean" || typeof pbr !== "boolean") throw new TypeError("texture and pbr must be booleans.");
+      if (!ALLOWED_QUALITY.has(geometryQuality)) throw new TypeError("geometryQuality must be standard or detailed.");
+      if (!["standard", "detailed", "extreme"].includes(textureQuality)) {
+        throw new TypeError("textureQuality must be standard, detailed or extreme.");
+      }
+      const inputs = [];
+      for (const view of allowedViews) {
+        if (views[view] === undefined) continue;
+        if (typeof views[view] !== "string" || !FILE_TOKEN.test(views[view])) {
+          throw new TypeError("views." + view + " must be a valid provider file token.");
+        }
+        inputs.push({ [view]: views[view] });
+      }
+      const data = await apiRequest("/generation/multiview-to-model", {
+        method: "POST",
+        signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputs,
+          model: requestedModel,
+          texture: texture || pbr,
+          pbr,
+          geometry_quality: geometryQuality,
+          texture_quality: textureQuality,
+        }),
+      }, "Tripo multiview-to-model submission");
+      if (typeof data.task_id !== "string" || !TASK_ID.test(data.task_id)) {
+        throw new TypeError("Tripo multiview-to-model response did not contain a valid task_id.");
+      }
+      return Object.freeze({ taskId: data.task_id, stage: "multiview-to-model" });
+    },
+
     async submitTextToModel({
       prompt,
       model: requestedModel = model,
