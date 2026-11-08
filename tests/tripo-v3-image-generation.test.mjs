@@ -150,6 +150,7 @@ test("runs a paid opt-in Tripo V3 single-image job from a rights-reviewed source
   assert.equal(result.report.status, "completed-requires-review");
   assert.equal(workerReport.engine, "tripo-v3-image-to-model");
   assert.equal(workerReport.generationStage, "image-to-model");
+  assert.equal(workerReport.taskType, "image_to_model");
   assert.equal(workerReport.sources.length, 1);
   assert.equal(workerReport.sources[0].sourceId, "front-photo");
   assert.equal(workerReport.sources[0].externalProviderProcessing, "explicitly-authorized");
@@ -191,6 +192,7 @@ test("runs labelled front/side multiview generation only when every selected sou
   const workerReport = result.report.modelReport;
   assert.equal(result.report.mode, "tripo-image-ai");
   assert.equal(workerReport.generationStage, "multiview-to-model");
+  assert.equal(workerReport.taskType, "multiview_to_model");
   assert.equal(workerReport.sameBuildingConfirmed, true);
   assert.deepEqual(workerReport.sources.map(source => source.view), ["front", "left"]);
   assert.equal(workerReport.sources.length, 2);
