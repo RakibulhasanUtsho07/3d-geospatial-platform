@@ -99,8 +99,13 @@ test("extrudes a closed facade profile with front, back and reveal faces", () =>
   assert.equal(result.boundaryEdgeCount, 4);
   assert.equal(quads.length, 6);
   assert.ok(quads.every((quad) => quad[0] === "glass"));
-  assert.deepEqual(quads[0][1], [0.5, 2, -0.1]);
-  assert.deepEqual(quads[1][1], [0.5, 2, -0.04]);
+  assert.equal(quads[0][1][0], 0.5);
+  assert.equal(quads[0][1][1], 2);
+  assert.ok(Math.abs(quads[0][1][2] + 0.1) < 1e-12);
+  assert.equal(quads[1][1][0], 0.5);
+  assert.equal(quads[1][1][1], 2);
+  assert.ok(Math.abs(quads[1][1][2] + 0.04) < 1e-12,
+    "the computed back-face offset must remain within floating-point tolerance");
 });
 
 test("subtracts an interior frame aperture and preserves every contour reveal", () => {
