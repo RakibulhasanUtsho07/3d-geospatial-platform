@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-external-store-snapshot:1.0.0",
+  "title": "External trust-registry governance store snapshot",
+  "description": "A provider state response bound to a separately maintained monotonic anchor. A schema-valid response does not prove the provider's hardware custody, linearizability or rollback-resistant durability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "state", "anchor"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._~:-]+$"
+    },
+    "state": {
+      "$ref": "urn:3d-geospatial-platform:schema:trust-registry-governance-state:1.0.0"
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "minimumAcceptedSequence", "stateSha256"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "minimumAcceptedSequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "stateSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

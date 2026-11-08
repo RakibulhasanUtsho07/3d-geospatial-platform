@@ -1,0 +1,1220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-provider-qualification:1.2.0",
+  "title": "External trust-registry governance provider qualification evidence",
+  "description": "Hash-bound provider deployment evidence. This manifest can reach ready-for-independent-review only; it never enables production qualification or release flags.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "manifestId",
+    "generatedAtUtc",
+    "source",
+    "provider",
+    "conformanceCi",
+    "providerIntegration",
+    "artifacts",
+    "evidence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0",
+        "1.3.0"
+      ]
+    },
+    "manifestId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+    },
+    "generatedAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "branch",
+        "commitSha"
+      ],
+      "properties": {
+        "repository": {
+          "const": "RakibulhasanUtsho07/3d-geospatial-platform"
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        },
+        "commitSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "providerId",
+        "implementation",
+        "version",
+        "environment",
+        "instanceFingerprintSha256",
+        "namespaceFingerprintSha256",
+        "endpointOrigin",
+        "syntheticOnly"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-provisioned",
+            "provisioned"
+          ]
+        },
+        "providerId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        },
+        "implementation": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "environment": {
+          "enum": [
+            "not-provisioned",
+            "development",
+            "staging",
+            "production"
+          ]
+        },
+        "instanceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "namespaceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "endpointOrigin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^https://[^/?#]+$"
+        },
+        "syntheticOnly": {
+          "type": "boolean"
+        },
+        "adapterModuleSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "conformanceCi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "push",
+        "pullRequest"
+      ],
+      "properties": {
+        "push": {
+          "$ref": "#/$defs/ciRun"
+        },
+        "pullRequest": {
+          "$ref": "#/$defs/ciRun"
+        }
+      }
+    },
+    "providerIntegration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "runId",
+        "runUrl",
+        "headSha",
+        "suiteConclusion",
+        "syntheticOnly",
+        "providerInstanceFingerprintSha256",
+        "providerNamespaceFingerprintSha256",
+        "fullRunConclusion"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-run",
+            "passed",
+            "failed",
+            "pending"
+          ]
+        },
+        "runId": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "runUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri",
+          "pattern": "^https://github\\.com/"
+        },
+        "headSha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "suiteConclusion": {
+          "enum": [
+            "not-run",
+            "success",
+            "failure",
+            "pending"
+          ]
+        },
+        "syntheticOnly": {
+          "type": "boolean"
+        },
+        "providerInstanceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "providerNamespaceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fullRunConclusion": {
+          "enum": [
+            "not-run",
+            "success",
+            "failure",
+            "in_progress",
+            "queued",
+            "pending"
+          ]
+        },
+        "processReportArtifactId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        },
+        "processReportSignatureArtifactId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/presentArtifact"
+          },
+          {
+            "$ref": "#/$defs/missingArtifact"
+          }
+        ]
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atomicBootstrapAndCompareAndSet",
+        "multiClientLinearizability",
+        "processRestartVisibility",
+        "ambiguousWriteRecovery",
+        "independentAnchorCustody",
+        "backupRestoreRollbackResistance",
+        "authenticatedClientIdentity",
+        "transportSecurity",
+        "leastPrivilegeAuthorization",
+        "keyCustodyAndRotation",
+        "auditRetention",
+        "operationalRecovery",
+        "independentSecurityReview"
+      ],
+      "properties": {
+        "atomicBootstrapAndCompareAndSet": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "multiClientLinearizability": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "processRestartVisibility": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "ambiguousWriteRecovery": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "independentAnchorCustody": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "backupRestoreRollbackResistance": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "authenticatedClientIdentity": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "transportSecurity": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "leastPrivilegeAuthorization": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "keyCustodyAndRotation": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "auditRetention": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "operationalRecovery": {
+          "$ref": "#/$defs/evidenceItem"
+        },
+        "independentSecurityReview": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/evidenceItem"
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "verificationKind": {
+                    "const": "independent-audit"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "independentAnchorWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "challengeArtifactId",
+        "witnessArtifactId"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-run",
+            "verified"
+          ]
+        },
+        "challengeArtifactId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+            }
+          ]
+        },
+        "witnessArtifactId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ciRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "runUrl",
+        "event",
+        "headSha",
+        "fullRunConclusion",
+        "providerConformanceStepConclusion",
+        "syntheticOnly"
+      ],
+      "properties": {
+        "runId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://github\\.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/[1-9][0-9]*$"
+        },
+        "event": {
+          "enum": [
+            "push",
+            "pull_request"
+          ]
+        },
+        "headSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "fullRunConclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "in_progress",
+            "queued",
+            "pending"
+          ]
+        },
+        "providerConformanceStepConclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "skipped",
+            "pending"
+          ]
+        },
+        "syntheticOnly": {
+          "const": true
+        }
+      }
+    },
+    "presentArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "status",
+        "relativePath",
+        "sha256",
+        "bytes",
+        "sourceUrl",
+        "sourceCommitSha"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        },
+        "type": {
+          "enum": [
+            "multi-client-concurrency-report",
+            "process-restart-report",
+            "process-report-signature",
+            "ambiguous-write-report",
+            "anchor-independence-review",
+            "anchor-witness-challenge",
+            "backup-restore-rollback-report",
+            "authenticated-client-identity-review",
+            "transport-security-review",
+            "least-privilege-review",
+            "key-custody-rotation-review",
+            "audit-retention-review",
+            "operational-recovery-review",
+            "independent-security-review",
+            "other"
+          ]
+        },
+        "status": {
+          "const": "present"
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 134217728
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "sourceCommitSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "missingArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        },
+        "type": {
+          "enum": [
+            "multi-client-concurrency-report",
+            "process-restart-report",
+            "process-report-signature",
+            "ambiguous-write-report",
+            "anchor-independence-review",
+            "anchor-witness-challenge",
+            "backup-restore-rollback-report",
+            "authenticated-client-identity-review",
+            "transport-security-review",
+            "least-privilege-review",
+            "key-custody-rotation-review",
+            "audit-retention-review",
+            "operational-recovery-review",
+            "independent-security-review",
+            "other"
+          ]
+        },
+        "status": {
+          "const": "missing"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "evidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "artifactIds",
+        "verificationKind"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "missing",
+            "failed",
+            "synthetic-only",
+            "not-run"
+          ]
+        },
+        "artifactIds": {
+          "type": "array",
+          "maxItems": 30,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+          }
+        },
+        "verificationKind": {
+          "enum": [
+            "provider-test",
+            "independent-audit",
+            "synthetic-test",
+            "none"
+          ]
+        }
+      }
+    },
+    "independentAnchorWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "challengeArtifactId",
+        "witnessArtifactId"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-run",
+            "verified"
+          ]
+        },
+        "challengeArtifactId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+            }
+          ]
+        },
+        "witnessArtifactId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          }
+        },
+        "required": [
+          "schemaVersion"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "status",
+              "providerId",
+              "implementation",
+              "version",
+              "environment",
+              "instanceFingerprintSha256",
+              "namespaceFingerprintSha256",
+              "endpointOrigin",
+              "syntheticOnly",
+              "adapterModuleSha256"
+            ]
+          },
+          "providerIntegration": {
+            "required": [
+              "status",
+              "runId",
+              "runUrl",
+              "headSha",
+              "suiteConclusion",
+              "syntheticOnly",
+              "providerInstanceFingerprintSha256",
+              "providerNamespaceFingerprintSha256",
+              "fullRunConclusion",
+              "processReportArtifactId"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not-run",
+                  "failed",
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "properties": {
+              "adapterModuleSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "not-provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "properties": {
+              "adapterModuleSha256": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "providerInstanceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "providerNamespaceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "runId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "runUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://github\\.com/"
+              },
+              "headSha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "1.2.0",
+              "1.3.0"
+            ]
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "adapterModuleSha256"
+            ],
+            "properties": {
+              "adapterModuleSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "1.2.0",
+              "1.3.0"
+            ]
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "not-provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "adapterModuleSha256"
+            ],
+            "properties": {
+              "adapterModuleSha256": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "1.2.0",
+              "1.3.0"
+            ]
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ],
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "processReportSignatureArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "providerInstanceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "providerNamespaceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "runId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "runUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://github\\.com/"
+              },
+              "headSha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "1.2.0",
+              "1.3.0"
+            ]
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not-run",
+                  "failed",
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportSignatureArtifactId": {
+                "const": null
+              },
+              "processReportArtifactId": {
+                "const": null
+              }
+            },
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.3.0"
+          }
+        },
+        "required": [
+          "schemaVersion"
+        ]
+      },
+      "then": {
+        "required": [
+          "independentAnchorWitness"
+        ],
+        "properties": {
+          "independentAnchorWitness": {
+            "$ref": "#/$defs/independentAnchorWitness"
+          },
+          "provider": {
+            "required": [
+              "adapterModuleSha256"
+            ]
+          },
+          "providerIntegration": {
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.3.0"
+          },
+          "independentAnchorWitness": {
+            "properties": {
+              "status": {
+                "const": "not-run"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "independentAnchorWitness"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independentAnchorWitness": {
+            "properties": {
+              "challengeArtifactId": {
+                "const": null
+              },
+              "witnessArtifactId": {
+                "const": null
+              }
+            }
+          },
+          "evidence": {
+            "properties": {
+              "independentAnchorCustody": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "missing",
+                      "not-run"
+                    ]
+                  },
+                  "artifactIds": {
+                    "maxItems": 0
+                  },
+                  "verificationKind": {
+                    "const": "none"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.3.0"
+          },
+          "independentAnchorWitness": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "independentAnchorWitness"
+        ]
+      },
+      "then": {
+        "properties": {
+          "independentAnchorWitness": {
+            "properties": {
+              "challengeArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "witnessArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              }
+            }
+          },
+          "evidence": {
+            "properties": {
+              "independentAnchorCustody": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  },
+                  "verificationKind": {
+                    "const": "independent-audit"
+                  },
+                  "artifactIds": {
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

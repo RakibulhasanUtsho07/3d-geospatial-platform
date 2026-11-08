@@ -9,6 +9,7 @@ import {
   hashGenerationReviewPlacement,
 } from "./generation-job-review.mjs";
 import { publishReviewedBuildingModel } from "./published-model-catalog.mjs";
+import { verifyGenerationJobPublicationReview } from "./generation-job-publication-review.mjs";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -99,7 +100,7 @@ async function readAndVerifyQueueRequest(root, jobId) {
  * QA report and request checksums still match. Publication placement must also
  * exactly match the immutable transform recorded at approval.
  */
-export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot = workspaceRoot, jobId, placement }) {
+export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot = workspaceRoot, jobId, placement, reviewReceipt }) {
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("jobId must be a safe identifier.");
   const requestedPlacement = normalizeGenerationReviewPlacement(placement);
 
@@ -143,6 +144,13 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
       JSON.stringify(requestedPlacement) !== JSON.stringify(reviewedPlacement)) {
     throw new Error("Publication placement must exactly match the immutable approved review placement.");
   }
+  const reviewerAuthentication = verifyGenerationJobPublicationReview({
+    receipt: reviewReceipt,
+    jobId,
+    buildingId: job.buildingId,
+    reviewRecord: record,
+    reviewRecordSha256: recordSha256,
+  });
   if (!isRecord(record.candidate) || record.candidate.modelSha256 !== job.result?.modelSha256 ||
       record.candidate.reportPath !== job.result?.reportPath ||
       !SHA256.test(record.candidate.reportSha256 ?? "")) {
@@ -200,12 +208,17 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
   };
 
   try {
-    await writeFile(attestationPath, JSON.stringify(attestation, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    const attestationBytes = Buffer.from(JSON.stringify(attestation, null, 2) + "\n", "utf8");
+    const attestationSha256 = sha256(attestationBytes);
+    await writeFile(attestationPath, attestationBytes, { flag: "wx", mode: 0o600 });
     const published = await publishReviewedBuildingModel({
       workspaceRoot: root,
       publicRoot,
       candidatePath: job.result.modelPath,
       attestationPath,
+      expectedCandidateSha256: modelHash,
+      expectedAttestationSha256: attestationSha256,
+      reviewerAuthentication,
     });
     return {
       ...published,
@@ -216,6 +229,9 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
       placement: attestation.model.position,
       placementHeightReference: reviewedPlacement.heightReference,
       placementSha256: reviewedPlacementSha256,
+      signedReviewPayloadSha256: reviewerAuthentication.signedPayloadSha256,
+      signedReviewReceiptSha256: reviewerAuthentication.signedReviewReceiptSha256,
+      reviewerAuthentication,
       mapReady: false,
       publicationEligible: false,
       note: "Catalog version was explicitly published; review history remains immutable. Job state remains a review candidate.",

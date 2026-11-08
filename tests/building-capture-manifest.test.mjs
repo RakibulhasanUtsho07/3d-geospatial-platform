@@ -119,14 +119,31 @@ test("requires verified independent dimension records and non-collinear reviewed
   assert.ok(report.checks.some((check) => check.id === "survey-control-evidence" && check.status === "warning"));
 });
 
-test("raw video does not count as a side view until an extracted video-frame is linked", () => {
+
+test("raw video does not count as a side view until an extracted video frame is linked", () => {
   const manifest = fixture();
-  const right = manifest.sources.find((item) => item.id === "capture-right");
-  right.kind = "video";
+  const video = manifest.sources.find((item) => item.id === "capture-right");
+  video.kind = "video";
   const report = assessBuildingCaptureManifest(manifest, { fileIntegrity: fileIntegrity(manifest) });
   assert.equal(report.status, "incomplete");
   assert.equal(report.counts.captures, 3);
   assert.equal(report.counts.videos, 1);
   assert.ok(report.checks.some((check) => check.id === "capture-source-coverage-and-rights" && check.status === "warning"));
   assert.ok(report.checks.some((check) => check.id === "video-frame-extraction" && check.status === "warning"));
+});
+
+test("a linked extracted video frame can satisfy the missing facade-side capture", () => {
+  const manifest = fixture();
+  const video = manifest.sources.find((item) => item.id === "capture-right");
+  video.kind = "video";
+  const frame = source("capture-right-frame", "capture", "right", 9);
+  frame.kind = "video-frame";
+  frame.sourceId = video.sourceId;
+  manifest.sources.push(frame);
+  const report = assessBuildingCaptureManifest(manifest, { fileIntegrity: fileIntegrity(manifest) });
+  assert.equal(report.counts.captures, 4);
+  assert.equal(report.counts.videos, 1);
+  assert.equal(report.status, "ready-for-review");
+  assert.ok(report.checks.some((check) => check.id === "video-frame-extraction" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.id === "capture-source-coverage-and-rights" && check.status === "passed"));
 });

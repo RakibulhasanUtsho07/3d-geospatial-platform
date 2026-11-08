@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:survey-observation-device-attestation:1.0.0",
+  "title": "Survey observation device-key attestation",
+  "description": "Domain-separated Ed25519 key-possession statement for exact observation record/checkpoint bytes; not hardware certification or release approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "engine",
+    "algorithm",
+    "signaturePurpose",
+    "observationId",
+    "checkpointId",
+    "buildingId",
+    "recordSha256",
+    "recordBytes",
+    "controlPointManifestSha256",
+    "deviceId",
+    "manufacturerId",
+    "modelId",
+    "deviceSerialCommitmentSha256",
+    "enrollmentEvidenceSha256",
+    "keyId",
+    "registryId",
+    "publicKeyFingerprintSha256",
+    "registryIssuedAtUtc",
+    "registryExpiresAtUtc",
+    "keyValidFromUtc",
+    "keyValidUntilUtc",
+    "attestedAtUtc",
+    "publicationEligible",
+    "note",
+    "signatureBase64"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "engine": {
+      "const": "survey-observation-device-attestation-v1"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signaturePurpose": {
+      "const": "survey-observation-device-key-association-only"
+    },
+    "observationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "checkpointId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "buildingId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "recordSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "recordBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "controlPointManifestSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "manufacturerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "modelId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "deviceSerialCommitmentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "enrollmentEvidenceSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "registryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "publicKeyFingerprintSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "registryIssuedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "registryExpiresAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "keyValidFromUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "keyValidUntilUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "attestedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publicationEligible": {
+      "const": false
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
+  }
+}

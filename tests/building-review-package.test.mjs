@@ -104,3 +104,292 @@ test("rejects evidence digest mismatch instead of creating a misleading package 
   const { readiness, artifacts, renderManifestViews } = fixture({ badDigest: true });
   assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews }), /evidence-digest-mismatch:texture-qa/);
 });
+
+
+test("binds the complete D3M-08 georeference evidence group to the exact review candidate", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const candidateHash = artifacts.find((item) => item.artifactType === "candidate-glb").sha256;
+  const evidenceBodies = [
+    ["single-image-smoke-report", "reports/single-image-runtime-smoke.json", "smoke-report"],
+    ["single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", "generation-receipt"],
+    ["single-image-workflow-report", "reports/single-image-workflow-report.json", "workflow-report"],
+    ["single-image-control-point-manifest", "evidence/single-image-control-points.json", "control-point-manifest"],
+  ];
+  const hashes = {};
+  for (const [artifactType, relativePath, body] of evidenceBodies) {
+    const bytes = Buffer.from(body);
+    const digest = hash(bytes);
+    hashes[artifactType] = digest;
+    artifacts.push({ artifactType, relativePath, sha256: digest, bytes: bytes.length });
+  }
+  const singleImageEvidence = {
+    schemaVersion: "1.0.0",
+    jobId: "smoke-job-1",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: candidateHash,
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hashes["single-image-control-point-manifest"],
+    smokeReportSha256: hashes["single-image-smoke-report"],
+    generationArtifactReceiptSha256: hashes["single-image-generation-artifact-receipt"],
+    workflowReportSha256: hashes["single-image-workflow-report"],
+    verticalDatum: "not-solved",
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+    files: evidenceBodies,
+  };
+  const result = buildBuildingReviewPackageManifest({
+    buildingId: "test-building",
+    readinessReport: readiness,
+    artifacts,
+    renderManifestViews,
+    singleImageEvidence,
+    generatedAt: "2026-10-21T12:00:00Z",
+  });
+  assert.equal(result.singleImageEvidence.jobId, "smoke-job-1");
+  assert.equal(result.singleImageEvidence.candidateGlbSha256, candidateHash);
+  assert.equal(result.singleImageEvidence.publicationEligible, false);
+  assert.equal(Object.hasOwn(result.singleImageEvidence, "files"), false);
+});
+
+test("rejects partial, unbound or non-reviewable D3M-08 evidence groups", () => {
+  const partial = fixture();
+  partial.artifacts.push({
+    artifactType: "single-image-smoke-report",
+    relativePath: "reports/single-image-runtime-smoke.json",
+    sha256: hash("smoke-report"),
+    bytes: 12,
+  });
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building",
+    readinessReport: partial.readiness,
+    artifacts: partial.artifacts,
+    renderManifestViews: partial.renderManifestViews,
+  }), /metadata-missing/);
+
+  const invalid = fixture();
+  const evidence = {
+    schemaVersion: "1.0.0",
+    jobId: "smoke-job-1",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: hash("different-candidate"),
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hash("manifest"),
+    smokeReportSha256: hash("smoke"),
+    generationArtifactReceiptSha256: hash("receipt"),
+    workflowReportSha256: hash("workflow"),
+    verticalDatum: "not-solved",
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building",
+    readinessReport: invalid.readiness,
+    artifacts: invalid.artifacts,
+    renderManifestViews: invalid.renderManifestViews,
+    singleImageEvidence: evidence,
+  }), /single-image-evidence-metadata-invalid/);
+});
+
+
+test("binds the optional EPSG:4979 ellipsoidal-height summary to the same single-image package group", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const candidateHash = artifacts.find((item) => item.artifactType === "candidate-glb").sha256;
+  const evidenceBodies = [
+    ["single-image-smoke-report", "reports/single-image-runtime-smoke.json", "smoke-report"],
+    ["single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", "generation-receipt"],
+    ["single-image-workflow-report", "reports/single-image-workflow-report.json", "workflow-report"],
+    ["single-image-control-point-manifest", "evidence/single-image-control-points.json", "control-point-manifest"],
+  ];
+  const hashes = {};
+  for (const [artifactType, relativePath, body] of evidenceBodies) {
+    const bytes = Buffer.from(body);
+    hashes[artifactType] = hash(bytes);
+    artifacts.push({ artifactType, relativePath, sha256: hashes[artifactType], bytes: bytes.length });
+  }
+  const singleImageEvidence = {
+    schemaVersion: "1.1.0",
+    jobId: "smoke-job-vertical",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: candidateHash,
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hashes["single-image-control-point-manifest"],
+    smokeReportSha256: hashes["single-image-smoke-report"],
+    generationArtifactReceiptSha256: hashes["single-image-generation-artifact-receipt"],
+    workflowReportSha256: hashes["single-image-workflow-report"],
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    verticalStatus: "calibrated-needs-human-review",
+    verticalEvidenceSha256: hash("canonical-vertical-evidence"),
+    verticalReferenceFrame: "WGS 84 (G2139)",
+    verticalCoordinateEpoch: 2022.25,
+    verticalHeightOffsetM: 135.5,
+    verticalRmsErrorM: 0.025,
+    verticalMaxResidualM: 0.041,
+    verticalControlPointCount: 4,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+    files: evidenceBodies,
+  };
+  const result = buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts,
+    renderManifestViews, singleImageEvidence, generatedAt: "2026-10-21T12:00:00Z",
+  });
+  assert.equal(result.singleImageEvidence.verticalDatum, "EPSG:4979-ellipsoidal");
+  assert.equal(result.singleImageEvidence.verticalReferenceFrame, "WGS 84 (G2139)");
+  assert.equal(result.singleImageEvidence.verticalCoordinateEpoch, 2022.25);
+  assert.equal(result.singleImageEvidence.verticalHeightOffsetM, 135.5);
+  assert.equal(result.singleImageEvidence.verticalControlPointCount, 4);
+  assert.equal(result.singleImageEvidence.publicationEligible, false);
+});
+
+test("rejects ellipsoidal metadata without the complete vertical-evidence digest binding", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const evidence = {
+    schemaVersion: "1.1.0",
+    jobId: "smoke-job-vertical",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: hash("candidate-glb"),
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hash("manifest"),
+    smokeReportSha256: hash("smoke"),
+    generationArtifactReceiptSha256: hash("receipt"),
+    workflowReportSha256: hash("workflow"),
+    verticalDatum: "EGM96-orthometric",
+    verticalStatus: "calibrated-needs-human-review",
+    verticalReferenceFrame: "WGS 84 (G2139)",
+    verticalCoordinateEpoch: 2022.25,
+    verticalHeightOffsetM: 135.5,
+    verticalRmsErrorM: 0.025,
+    verticalMaxResidualM: 0.041,
+    verticalControlPointCount: 4,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts,
+    renderManifestViews, singleImageEvidence: evidence,
+  }), /single-image-evidence-metadata-invalid/);
+});
+
+
+test("binds independent held-out 3D checkpoint metrics to the single-image review package", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const candidateHash = artifacts.find((item) => item.artifactType === "candidate-glb").sha256;
+  const evidenceBodies = [
+    ["single-image-smoke-report", "reports/single-image-runtime-smoke.json", "smoke-report"],
+    ["single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", "generation-receipt"],
+    ["single-image-workflow-report", "reports/single-image-workflow-report.json", "workflow-report"],
+    ["single-image-control-point-manifest", "evidence/single-image-control-points.json", "control-point-manifest"],
+  ];
+  const hashes = {};
+  for (const [artifactType, relativePath, body] of evidenceBodies) {
+    const bytes = Buffer.from(body);
+    hashes[artifactType] = hash(bytes);
+    artifacts.push({ artifactType, relativePath, sha256: hashes[artifactType], bytes: bytes.length });
+  }
+  const singleImageEvidence = {
+    schemaVersion: "1.2.0",
+    jobId: "smoke-job-checkpoints",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: candidateHash,
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hashes["single-image-control-point-manifest"],
+    smokeReportSha256: hashes["single-image-smoke-report"],
+    generationArtifactReceiptSha256: hashes["single-image-generation-artifact-receipt"],
+    workflowReportSha256: hashes["single-image-workflow-report"],
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    verticalStatus: "calibrated-needs-human-review",
+    verticalEvidenceSha256: hash("canonical-vertical-evidence"),
+    verticalReferenceFrame: "WGS 84 (G2139)",
+    verticalCoordinateEpoch: 2022.25,
+    verticalHeightOffsetM: 135.5,
+    verticalRmsErrorM: 0.025,
+    verticalMaxResidualM: 0.041,
+    verticalControlPointCount: 4,
+    checkpointValidationStatus: "validated-needs-human-review",
+    checkpointEvidenceSha256: hash("canonical-checkpoint-evidence"),
+    checkpointReferenceFrame: "WGS 84 (G2139)",
+    checkpointCoordinateEpoch: 2022.25,
+    checkpointCount: 6,
+    checkpointHorizontalRmsErrorM: 0.04,
+    checkpointHorizontalMaxResidualM: 0.08,
+    checkpointVerticalRmsErrorM: 0.03,
+    checkpointVerticalMaxResidualM: 0.07,
+    checkpoint3dRmsErrorM: 0.05,
+    checkpoint3dMaxResidualM: 0.1,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+    files: evidenceBodies,
+  };
+  const result = buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts,
+    renderManifestViews, singleImageEvidence,
+    generatedAt: "2026-10-21T12:00:00Z",
+  });
+  assert.equal(result.singleImageEvidence.schemaVersion, "1.2.0");
+  assert.equal(result.singleImageEvidence.checkpointCount, 6);
+  assert.equal(result.singleImageEvidence.checkpointValidationStatus, "validated-needs-human-review");
+  assert.equal(result.singleImageEvidence.checkpointEvidenceSha256, hash("canonical-checkpoint-evidence"));
+  assert.equal(result.singleImageEvidence.checkpoint3dRmsErrorM, 0.05);
+  assert.equal(result.singleImageEvidence.mapReady, false);
+  assert.equal(result.singleImageEvidence.publicationEligible, false);
+  assert.equal(result.singleImageEvidence.automaticApproval, false);
+});
+
+test("rejects missing or under-count held-out 3D checkpoint metadata", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const evidence = {
+    schemaVersion: "1.2.0",
+    jobId: "smoke-job-checkpoints",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: artifacts.find((item) => item.artifactType === "candidate-glb").sha256,
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: hash("manifest"),
+    smokeReportSha256: hash("smoke"),
+    generationArtifactReceiptSha256: hash("receipt"),
+    workflowReportSha256: hash("workflow"),
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    verticalStatus: "calibrated-needs-human-review",
+    verticalEvidenceSha256: hash("vertical-evidence"),
+    verticalReferenceFrame: "WGS 84 (G2139)",
+    verticalCoordinateEpoch: 2022.25,
+    verticalHeightOffsetM: 135.5,
+    verticalRmsErrorM: 0.025,
+    verticalMaxResidualM: 0.041,
+    verticalControlPointCount: 4,
+    checkpointValidationStatus: "validated-needs-human-review",
+    checkpointEvidenceSha256: hash("checkpoint-evidence"),
+    checkpointReferenceFrame: "WGS 84 (G2139)",
+    checkpointCoordinateEpoch: 2022.25,
+    checkpointCount: 5,
+    checkpointHorizontalRmsErrorM: 0.04,
+    checkpointHorizontalMaxResidualM: 0.08,
+    checkpointVerticalRmsErrorM: 0.03,
+    checkpointVerticalMaxResidualM: 0.07,
+    checkpoint3dRmsErrorM: 0.05,
+    checkpoint3dMaxResidualM: 0.1,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts,
+    renderManifestViews, singleImageEvidence: evidence,
+  }), /single-image-evidence-metadata-invalid/);
+});

@@ -3,8 +3,16 @@ import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { canonicalJson } from "./generation-artifact-receipt.mjs";
+import { verifySingleImageGeoreferenceEvidence } from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.6.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
+const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const EARLIER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -76,6 +84,109 @@ function detectImageMimeType(bytes) {
   return null;
 }
 
+
+function canonicalTimestamp(value) {
+  return typeof value === "string" &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value;
+}
+
+function validateWorkerHostFingerprints(report) {
+  const workerHost = report.workerHost;
+  if (!workerHost || workerHost.inventorySchemaVersion !== "1.1.0" ||
+      workerHost.stableAcrossInference !== true) {
+    throw new TypeError("Smoke report is missing stable worker-host model artifact fingerprints.");
+  }
+  const validateSnapshot = (snapshot, label) => {
+    if (!snapshot || !canonicalTimestamp(snapshot.checkedAt) ||
+        !Number.isSafeInteger(snapshot.runner?.bytes) || snapshot.runner.bytes <= 0 ||
+        !HASH.test(snapshot.runner?.sha256 ?? "") ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(snapshot.backgroundRemovalModel ?? "")) {
+      throw new TypeError(label + " worker-host runner/model identity is malformed.");
+    }
+    const config = snapshot.modelArtifacts?.tripoConfig;
+    const checkpoint = snapshot.modelArtifacts?.tripoCheckpoint;
+    const rembg = snapshot.modelArtifacts?.rembgWeights;
+    const validArtifact = (item) => item?.status === "cached" &&
+      Number.isSafeInteger(item.bytes) && item.bytes > 0 && HASH.test(item.sha256 ?? "");
+    if (!validArtifact(config) || !/^[a-f0-9]{40}$/.test(config.snapshotRevision ?? "")) {
+      throw new TypeError(label + " TripoSR config fingerprint is invalid.");
+    }
+    if (!validArtifact(checkpoint) ||
+        !/^[a-f0-9]{40}$/.test(checkpoint.snapshotRevision ?? "") ||
+        checkpoint.snapshotRevision !== config.snapshotRevision) {
+      throw new TypeError(label + " TripoSR checkpoint fingerprint is invalid.");
+    }
+    if (!validArtifact(rembg)) {
+      throw new TypeError(label + " rembg model-weight fingerprint is invalid.");
+    }
+  };
+  validateSnapshot(workerHost.before, "Pre-inference");
+  validateSnapshot(workerHost.after, "Post-inference");
+  const fingerprintValues = (snapshot) => JSON.stringify({
+    runner: snapshot.runner,
+    backgroundRemovalModel: snapshot.backgroundRemovalModel,
+    modelArtifacts: snapshot.modelArtifacts,
+  });
+  if (fingerprintValues(workerHost.before) !== fingerprintValues(workerHost.after)) {
+    throw new TypeError("Smoke report worker-host model fingerprints changed across inference.");
+  }
+  return true;
+}
+
+
+function validateModelLoadEvidence(report) {
+  const evidence = report.modelLoadEvidence;
+  if (!evidence || evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified") {
+    throw new TypeError("Smoke report is missing verified process-side model-load evidence.");
+  }
+  const expected = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const loaders = evidence.loaders;
+  if (!loaders || typeof loaders !== "object" || Array.isArray(loaders) ||
+      JSON.stringify(Object.keys(loaders).sort()) !== JSON.stringify(expected.map(([role]) => role).sort())) {
+    throw new TypeError("Smoke report model-load evidence has an invalid loader set.");
+  }
+  for (const [role, loader] of expected) {
+    const observed = loaders[role];
+    const expectedArtifact = report.workerHost?.before?.modelArtifacts?.[role];
+    if (!observed || observed.loader !== loader ||
+        !Number.isSafeInteger(observed.bytes) || observed.bytes <= 0 ||
+        !HASH.test(observed.sha256 ?? "") ||
+        observed.bytes !== expectedArtifact?.bytes ||
+        observed.sha256 !== expectedArtifact?.sha256 ||
+        observed.exactBytesPassed !== true || observed.stable !== true) {
+      throw new TypeError("Smoke report model-load evidence does not match the pre-inference " + role + " fingerprint.");
+    }
+  }
+  return true;
+}
+
+
+function validateSourceImageLoadEvidence(report) {
+  const evidence = report.sourceLoadEvidence;
+  const expectedKeys = [
+    "bytes", "eventCount", "exactBytesPassed", "loader", "schemaVersion",
+    "sha256", "stable", "status",
+  ];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence) ||
+      JSON.stringify(Object.keys(evidence).sort()) !== JSON.stringify(expectedKeys) ||
+      evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified" ||
+      evidence.loader !== "PIL.Image.open" || evidence.exactBytesPassed !== true ||
+      evidence.stable !== true || evidence.eventCount !== 1 ||
+      evidence.bytes !== report.source?.bytes ||
+      evidence.sha256 !== report.source?.sha256 ||
+      !Number.isSafeInteger(evidence.bytes) || evidence.bytes <= 0 ||
+      !HASH.test(evidence.sha256 ?? "")) {
+    throw new TypeError("Smoke report source-image load evidence does not match the exact source image bytes.");
+  }
+  return true;
+}
+
+
 function parseGlb(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 20 ||
       bytes.readUInt32LE(0) !== 0x46546c67 ||
@@ -95,9 +206,189 @@ function parseGlb(bytes) {
   return { meshCount: json.meshes.length };
 }
 
+function exactKeys(value, expected, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...expected].sort())) {
+    throw new TypeError(label + " has an invalid field set.");
+  }
+}
+
+async function verifyGenerationArtifactReceipt({
+  root,
+  jobId,
+  report,
+  sourceBytes,
+  sourceHash,
+  modelBytes,
+  modelHash,
+  glb,
+  independentQa,
+}) {
+  const pointer = report.generationArtifactReceipt;
+  exactKeys(pointer, ["bytes", "path", "payloadSha256", "schemaVersion", "sha256"], "Generation artifact receipt reference");
+  const relativePath = safeRelativePath(pointer.path, "Generation artifact receipt path");
+  const expectedReceiptPath = ".building-engine/runtime-smokes/" + jobId + ".artifact.json";
+  const expectedReceiptSchemaVersion = report.schemaVersion === "1.6.0" ? "1.2.0" :
+    report.schemaVersion === "1.5.0" ? "1.1.0" : "1.0.0";
+  if (pointer.schemaVersion !== expectedReceiptSchemaVersion || relativePath !== expectedReceiptPath ||
+      !Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0 || pointer.bytes > 256 * 1024 ||
+      !HASH.test(pointer.sha256 ?? "") || !HASH.test(pointer.payloadSha256 ?? "")) {
+    throw new TypeError("Generation artifact receipt reference is invalid or does not match this smoke job.");
+  }
+  const receiptFile = path.join(root, ...relativePath.split("/"));
+  const receiptEntry = await lstat(receiptFile);
+  if (receiptEntry.isSymbolicLink() || !receiptEntry.isFile()) {
+    throw new TypeError("Generation artifact receipt must be a regular non-symlink file.");
+  }
+  if (process.platform !== "win32" && (receiptEntry.mode & 0o077) !== 0) {
+    throw new TypeError("Generation artifact receipt permissions are not private.");
+  }
+  const receiptBytes = await readRegularWorkspaceFile(root, relativePath, "Generation artifact receipt", 256 * 1024);
+  if (receiptBytes.length !== pointer.bytes || sha256(receiptBytes) !== pointer.sha256) {
+    throw new Error("Generation artifact receipt byte count or SHA-256 does not match its report reference.");
+  }
+  const envelope = JSON.parse(receiptBytes.toString("utf8"));
+  exactKeys(envelope, ["payload", "payloadSha256", "schemaVersion"], "Generation artifact receipt envelope");
+  if (envelope.schemaVersion !== pointer.schemaVersion || !HASH.test(envelope.payloadSha256 ?? "") ||
+      envelope.payloadSha256 !== pointer.payloadSha256 ||
+      sha256(Buffer.from(canonicalJson(envelope.payload), "utf8")) !== envelope.payloadSha256 ||
+      !receiptBytes.equals(Buffer.from(JSON.stringify(envelope, null, 2) + "\n", "utf8"))) {
+    throw new TypeError("Generation artifact receipt envelope is non-canonical or its payload digest is invalid.");
+  }
+
+  const payload = envelope.payload;
+  const receiptHasGeoreference = ["1.1.0", "1.2.0"].includes(pointer.schemaVersion);
+  exactKeys(payload, [
+    "buildingId", "geometryQa", "jobId", "kind", "modelLoadEvidence",
+    "output", "schemaVersion", "source", "workerHost", "workflowReport",
+    ...(receiptHasGeoreference ? ["georeference"] : []),
+  ], "Generation artifact receipt payload");
+  if (payload.schemaVersion !== pointer.schemaVersion ||
+      payload.kind !== "single-image-generation-artifact" ||
+      payload.jobId !== jobId || payload.buildingId !== report.buildingId) {
+    throw new TypeError("Generation artifact receipt payload identity is invalid.");
+  }
+
+  const expectedWorkflowPath = ".building-engine/jobs/" + report.buildingId + "/" + jobId + "-workflow/workflow-report.json";
+  exactKeys(payload.workflowReport, ["bytes", "mode", "path", "sha256", "status"], "Generation workflow report binding");
+  if (payload.workflowReport.path !== expectedWorkflowPath ||
+      !Number.isSafeInteger(payload.workflowReport.bytes) || payload.workflowReport.bytes <= 0 ||
+      payload.workflowReport.bytes > 1024 * 1024 || !HASH.test(payload.workflowReport.sha256 ?? "") ||
+      payload.workflowReport.status !== "completed-requires-review" ||
+      payload.workflowReport.mode !== "single-image-ai") {
+    throw new TypeError("Generation artifact receipt workflow-report binding is invalid.");
+  }
+  const workflowBytes = await readRegularWorkspaceFile(
+    root,
+    expectedWorkflowPath,
+    "Media-to-model generation workflow report",
+    1024 * 1024,
+  );
+  if (workflowBytes.length !== payload.workflowReport.bytes ||
+      sha256(workflowBytes) !== payload.workflowReport.sha256) {
+    throw new Error("On-disk generation workflow report byte count or SHA-256 does not match the artifact receipt.");
+  }
+  const workflowReport = JSON.parse(workflowBytes.toString("utf8"));
+  const selectedViews = workflowReport.inputs?.selectedViewIds;
+  const mediaRecord = workflowReport.inputs?.mediaRecords?.find((item) => item.id === report.source.sourceId);
+  if (workflowReport.jobId !== jobId || workflowReport.buildingId !== report.buildingId ||
+      workflowReport.status !== "completed-requires-review" || workflowReport.mode !== "single-image-ai" ||
+      workflowReport.mapReady !== false || workflowReport.publicationEligible !== false ||
+      !Array.isArray(selectedViews) || selectedViews.length !== 1 || selectedViews[0] !== report.source.sourceId ||
+      !mediaRecord || mediaRecord.sha256 !== sourceHash || mediaRecord.mimeType !== report.source.mimeType ||
+      mediaRecord.usageStatus !== "approved" ||
+      workflowReport.output?.modelPath !== report.output.relativePath ||
+      workflowReport.output?.modelBytes !== modelBytes.length ||
+      workflowReport.output?.modelSha256 !== modelHash ||
+      workflowReport.modelReport?.source?.sha256 !== sourceHash ||
+      workflowReport.modelReport?.outputs?.glb?.sha256 !== modelHash ||
+      workflowReport.modelReport?.outputs?.glb?.bytes !== modelBytes.length ||
+      workflowReport.modelReport?.mapReady !== false ||
+      workflowReport.modelReport?.publicationEligible !== false) {
+    throw new TypeError("On-disk generation workflow report does not bind this exact source and GLB candidate.");
+  }
+
+  exactKeys(payload.source, ["bytes", "loaderEvidence", "mimeType", "sha256", "sourceId"], "Generation receipt source binding");
+  exactKeys(payload.workerHost, ["after", "before", "inventorySchemaVersion", "stableAcrossInference"], "Generation receipt worker binding");
+  exactKeys(payload.output, ["bytes", "format", "meshCount", "path", "sha256"], "Generation receipt GLB binding");
+  exactKeys(payload.geometryQa, [
+    "counts", "engine", "schemaVersion", "sourceStatus", "status", "valid", "warningCount", "warnings",
+  ], "Generation receipt geometry QA binding");
+  const expectedPayload = {
+    schemaVersion: pointer.schemaVersion,
+    kind: "single-image-generation-artifact",
+    buildingId: report.buildingId,
+    jobId,
+    workflowReport: {
+      path: expectedWorkflowPath,
+      bytes: workflowBytes.length,
+      sha256: sha256(workflowBytes),
+      status: workflowReport.status,
+      mode: workflowReport.mode,
+    },
+    source: {
+      sourceId: report.source.sourceId,
+      mimeType: sourceBytes.length ? report.source.mimeType : null,
+      bytes: sourceBytes.length,
+      sha256: sourceHash,
+      loaderEvidence: report.sourceLoadEvidence,
+    },
+    workerHost: {
+      inventorySchemaVersion: report.workerHost.inventorySchemaVersion,
+      stableAcrossInference: report.workerHost.stableAcrossInference,
+      before: report.workerHost.before,
+      after: report.workerHost.after,
+    },
+    modelLoadEvidence: report.modelLoadEvidence,
+    output: {
+      path: report.output.relativePath,
+      format: "glb",
+      bytes: modelBytes.length,
+      sha256: modelHash,
+      meshCount: glb.meshCount,
+    },
+    geometryQa: {
+      schemaVersion: "1.0.0",
+      engine: independentQa.engine,
+      valid: independentQa.valid,
+      sourceStatus: independentQa.status,
+      status: report.geometryQa.status,
+      warningCount: report.geometryQa.warningCount,
+      warnings: report.geometryQa.warnings,
+      counts: report.geometryQa.counts,
+    },
+  };
+  if (receiptHasGeoreference) {
+    const verifiedGeoreference = await verifySingleImageGeoreferenceEvidence({
+      workspaceRoot: root,
+      evidence: report.georeferenceEvidence,
+      buildingId: report.buildingId,
+      sourceId: report.source.sourceId,
+      sourceSha256: sourceHash,
+      modelSha256: modelHash,
+    });
+    if (canonicalJson(workflowReport.georeference ?? null) !== canonicalJson(verifiedGeoreference.registration)) {
+      throw new TypeError("Generation workflow report georeference differs from independently recomputed control-point registration.");
+    }
+    expectedPayload.georeference = verifiedGeoreference;
+  }
+  if (canonicalJson(payload) !== canonicalJson(expectedPayload)) {
+    throw new TypeError("Generation artifact receipt is not fully bound to the source, worker, GLB and independent geometry-QA evidence.");
+  }
+  return {
+    verified: true,
+    schemaVersion: pointer.schemaVersion,
+    path: relativePath,
+    bytes: receiptBytes.length,
+    sha256: pointer.sha256,
+    payloadSha256: pointer.payloadSha256,
+    workflowReportSha256: payload.workflowReport.sha256,
+  };
+}
+
 /**
- * Independently re-checks the on-disk source and GLB hashes recorded by a successful
- * runtime smoke report. It never changes the report or publication/release flags.
+ * Independently re-checks the on-disk source, generation report, receipt and GLB hashes.
+ * It never changes the report or publication/release flags.
  */
 export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   safeId(jobId, "jobId");
@@ -115,13 +406,55 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   const report = JSON.parse(reportBytes.toString("utf8"));
 
   if (!report || typeof report !== "object" ||
-      report.schemaVersion !== SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION ||
+      ![
+        SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        EARLIER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+      ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
       !SAFE_ID.test(report.buildingId ?? "") ||
       report.status !== "passed") {
     throw new TypeError("Smoke evidence report schema, identity or status is invalid.");
   }
+  const hasWorkerFingerprintEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasProcessLoadEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasSourceImageLoadEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasGenerationArtifactReceipt = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasGeoreferenceEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
+  if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
+  if (hasSourceImageLoadEvidence) validateSourceImageLoadEvidence(report);
+
   if (report.readiness?.status !== "ready" ||
       report.readiness.tripoModelWeights !== "cached" ||
       report.readiness.backgroundRemovalWeights !== "cached" ||
@@ -237,6 +570,11 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       reportedQa.status !== expectedQaStatus) {
     throw new Error("Smoke GLB byte/hash/geometry-QA evidence does not match an independent disk analysis.");
   }
+  const generationArtifactReceipt = hasGenerationArtifactReceipt
+    ? await verifyGenerationArtifactReceipt({
+      root, jobId, report, sourceBytes, sourceHash, modelBytes, modelHash, glb, independentQa,
+    })
+    : null;
 
   return {
     verified: true,
@@ -259,6 +597,21 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       meshCount: glb.meshCount,
     },
     geometryQa: report.geometryQa,
+    workerHostFingerprintStatus: hasWorkerFingerprintEvidence
+      ? "stable-across-inference" : "not-recorded-legacy-schema",
+    modelLoadEvidenceStatus: hasProcessLoadEvidence
+      ? "verified-against-worker-preflight" : "not-recorded-legacy-schema",
+    sourceImageLoadEvidenceStatus: hasSourceImageLoadEvidence
+      ? "verified-against-source-manifest" : "not-recorded-legacy-schema",
+    generationArtifactReceiptStatus: hasGenerationArtifactReceipt
+      ? "verified" : "not-recorded-legacy-schema",
+    georeferenceEvidenceStatus: hasGeoreferenceEvidence
+      ? report.georeferenceEvidence.status : "not-recorded-legacy-schema",
+    ...(hasGeoreferenceEvidence ? { georeferenceEvidence: report.georeferenceEvidence } : {}),
+    ...(generationArtifactReceipt ? { generationArtifactReceipt } : {}),
+    ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
+    ...(hasProcessLoadEvidence ? { modelLoadEvidence: report.modelLoadEvidence } : {}),
+    ...(hasSourceImageLoadEvidence ? { sourceLoadEvidence: report.sourceLoadEvidence } : {}),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,

@@ -1,6 +1,6 @@
 # 3D Geospatial Platform — Engine Completion Roadmap
 
-**Audit date:** 2026-11-03  
+**Audit date:** 2026-11-08  
 **Target branch flow:** `rakibul-hasan` → `development` → `main`  
 **Current status:** P3.6–P3.8 and D3M-01 foundations are integrated on current `main`/`dev`. P3.7 floor-plan raster-to-vector calibration has merged as a private human-review workflow; P3.4 map-panel UX and imagery diagnostics are in a refreshed current-main validation candidate. P3.2 still lacks real surveyed building evidence, and P3.4 must not be marked complete until its clean exact-head six-sample baseline and Full CI pass.
 
@@ -14,7 +14,7 @@
 
 ## Verified baseline
 
-- Current `main` candidate: `0bf007d2c6749475936d18d0168c168b1ca3fd7e`.
+- Current `main` candidate (2026-11-04 audit): `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
 - Post-merge CI run [#40119673648](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40119673648) passed lint, production build, automated engine/GLB checks, generated spatial-tile checks, and the production viewport API browser test.
 - P2.6–P2.20 viewport workload, caching, cancellation, cross-process repeatability, performance trend, and geometry-read diagnostics are integrated. Their benchmark reports describe bounded workloads; they do not establish a universal FPS or latency SLA.
 - Existing capabilities include Cesium viewport loading, Overture-derived footprint extrusion, OSM road geometry/nearby services, deterministic procedural GLB, candidate generation/review gates, GLB QA, dimension checking, horizontal WGS84 ground-control fitting, render/reference diagnostic tools, and a measured-vector floor-plan shell generator.
@@ -173,7 +173,7 @@ The codebase still needs real-data validation and product-level completion. The 
 - Added metric-geometry/strategy helper regression tests and a CI step.
 - [x] Baseline exact-head Full CI passed on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb`: [run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751), 179/179 steps. This validates automated code/build checks, not an actual TripoSR/COLMAP reconstruction, image quality, survey registration or accuracy.
 - Added local Hugging Face cache checks for TripoSR `config.yaml` and `model.ckpt`; single-image AI is claimable only when both files are cached. Any commit added after the cited SHA needs its own exact-head checks.
-- D3M-02 is now merged into main through PR #302 (merge commit `4ec5305108870a2cc30bd203c4a3c8c7ab9613a0`). D3M-03 has been reconciled against that main base in `integration/d3m03-main-reconciled-20261103`; this integrated candidate still requires exact-head CI and code review before merge.
+- D3M-03 was reconciled against current main and promoted through PR #324 on 2026-11-03; its source intake, operator-session, consent gates and job tracking are now part of main. The later D3M-04→D3M-07 cumulative stack was promoted through PR #325.
 - **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. WebP is not a valid selected input for the current single-image AI or COLMAP photogrammetry worker; it is rejected at UI and queue preflight for those strategies. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
 
 ## D3M-04 — TripoSR background-removal runtime readiness
@@ -187,15 +187,15 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Keep single-image AI unclaimable until both TripoSR weights and the active rembg model weights are cached; unknown API/resolver layouts remain `unknown` and fail closed rather than being mislabeled as missing.
 - [x] Surface missing/unknown background-removal cache state in the operator panel and persist only sanitized model identifiers/state, never cache paths or process output.
 - [x] Add executable Python-probe contract tests for cached/missing/unknown states, missing ONNX Runtime import, legacy worker-status compatibility, and worker-level queue non-consumption (attempt remains zero).
-- [x] Exact-head PR Full CI passed on D3M-04 branch head `d05274f4c30fddc45dc41cd464573c40b6745e58`: [run #41405970254](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41405970254), job `Lint and production build`, 179 workflow steps, no failed steps. PR #306 remains Draft pending independent review.
+- [x] D3M-04 cache-readiness implementation was included in the cumulative main promotion PR #325. The post-promotion main Full CI #41649268743 passed 207/207 steps, including D3M-05/07 and worker inventory checks. The real worker's Python/device/cache state still requires operator preflight on the provisioned host.
 - **Important licensing limit:** rembg package licensing is separate from model-weight licensing. Current upstream rembg documentation identifies `bria-rmbg` as its default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Deployment must deliberately choose a model and verify applicable rights before commercial use.
 - **No accuracy claim:** readiness does not prove that a real TripoSR run succeeds, that the output matches a building, that scale/georeferencing is correct, or that the candidate is map-ready. Release flags remain fail-closed.
 
 
-## D3M-05 — Offline single-image runtime smoke (implementation candidate)
+## D3M-05 — Offline single-image runtime smoke (implementation integrated; real-host gate pending)
 
 **Tracking issue:** [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307)  
-**Dependency:** D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Source integration:** cumulative D3M-04→D3M-07 promotion PR #325 merged to main; D3M-ENGINE-02 host inventory follow-up merged by PR #347.  
 **Implementation branch:** `feat/d3m05-single-image-runtime-smoke-20261102`  
 **Runbook:** [D3M-05 Single-image Runtime Smoke](D3M-05-SINGLE-IMAGE-RUNTIME-SMOKE.md)
 
@@ -215,12 +215,13 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Post-CI audit found that workflow failure before the TripoSR child-process `spawn` event could be mislabelled as inference failure. Runtime evidence and the independent verifier now distinguish workflow failure, runner launch attempt, actual process spawn and completed output; regression tests cover pre-launch failure and OS process-spawn failure.
 - [x] Exact-head PR Full CI passed on the D3M-05 runner-launch-correction branch head `07e122053ff99059b72661e85e4f2e44b2a3c8ac`: [run #41412587662](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41412587662), job `Lint and production build`, 182 workflow steps, no failed steps. The D3M-06 descendant branch also re-ran the complete suite successfully; this does not replace the still-pending real worker-host inference.
 - [ ] Operator-run one real inference on the provisioned worker host with model licences, source rights, runtime/device and local cache checked; retain the private smoke report and independently review the GLB.
-- **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. No PR in the D3M-02 → D3M-05 stack is merged by this milestone.
+- [x] Implementation stack integrated into main through PR #325; later worker-host inventory tooling added through PR #347. Main Full CI #41649268743 passed 207/207 and includes the D3M-05 contract test and CLI validation.
+- **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. Source integration is complete; the actual worker-host inference and independent GLB review are not.
 
-## D3M-06 — bind reviewed placement to the map publication transform (implementation candidate)
+## D3M-06 — bind reviewed placement to the map publication transform (integrated into main; operational proof pending)
 
 **Tracking issue:** [#309](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/309)  
-**Dependency:** D3M-05 PR #308 → D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Source integration:** cumulative D3M-04→D3M-07 promotion PR #325 merged to main.  
 **Implementation branch:** `feat/d3m06-reviewed-map-placement-binding-20261102`
 
 - [x] Repository audit confirmed the review API stored boolean metric-scale/georeference checks but no numeric placement; the map publication API independently accepted a new transform after approval.
@@ -232,14 +233,14 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Add an operator CLI end-to-end regression that publishes a synthetic approved job using the exact stored placement digest and WGS84 ellipsoid height reference.
 - [x] Focused review/publication tests, ESLint and production build passed in the exact D3M-06 branch Full CI job on code head `f8b974465ac6d52b32ada50fb2356844a6f126d8`; see PR CI run [#41415299310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41415299310). The run includes the approved-review-to-explicit-map-publication test, review-decision/candidate-integrity/publication-gate tests, and production build.
 - [x] Exact-head PR Full CI passed on `f8b974465ac6d52b32ada50fb2356844a6f126d8`: [run #41415299310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41415299310), job `Lint and production build`, 182 workflow steps, no failed steps. The run contains successful ESLint, reviewed catalog publishing/rollback, approved generation review-to-map publication, review-decision/candidate-integrity/publication-gate checks, and production build.
-- [ ] Record a separate exact-head Push CI pass before promotion. The available commit-scoped workflow result only exposes PR-triggered runs; no Push CI success is claimed here.
-- [ ] Next operational gate: run the D3M-05 single-image smoke on the provisioned worker host using the real TripoSR/rembg caches and reviewed model/source terms, then independently verify and visually inspect the private GLB/report. This requires access to the actual worker host and must not be replaced by CI fakes.
+- [x] Cumulative D3M-06 code and tests were included in main through PR #325; post-merge main CI #41649268743 passed 207/207.
+- [ ] Operational gate remains the D3M-05 real worker-host smoke, independent verifier and human GLB inspection. Reviewed placement binding does not itself prove survey truth or architectural accuracy.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.
 
-## D3M-07 — non-inference single-image worker preflight
+## D3M-07 — non-inference single-image worker preflight (integrated into main; real-host run pending)
 
 **Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
-**Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
+**Source integration:** cumulative main promotion PR #325; inventory hardening follow-up PR #347.
 
 - [x] Add a preflight adapter around the authoritative D3M-04 capability probe; request only `single-image-ai` so this check does not launch unrelated COLMAP commands.
 - [x] Require TripoSR and rembg caches to be explicitly `cached` before returning ready; reject missing, unknown, malformed and blocked states.
@@ -250,22 +251,23 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation, secret/path non-disclosure, strategy scoping and a real-Python runner-execution marker check.
 - [x] Add the tests and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
 - [x] Align the D3M-05 real-smoke readiness recheck with the same single-image-only strategy scope; keep actual TripoSR execution inside the authorized inference workflow.
-- [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
-- [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
+- [x] Promoted into main through PR #325. Main Full CI #41649268743 passed the D3M-07 preflight test and CLI validation; D3M-ENGINE-02 inventory tests also passed on the same main head.
+- [ ] Operator must run the preflight and inventory on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
 - **Safety boundary:** the preflight does not execute the configured TripoSR runner or call model-download/inference APIs. Python imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic read-only environment, OS sandbox or host firewall. Apply host/network egress and filesystem controls when strict guarantees are required.
 
 ## 2026-11-03 — Promotion state and remaining operational gates
 
 - D3M-02 and D3M-03 are merged to main (PRs #302 and #324).
-- D3M-04 through D3M-07 have successful exact-head PR Full CI on the cumulative source stack head `e60a46162e873846a81122812151be0855ec83d3` ([run #41464331828](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41464331828), 184/184 steps). This is prior-stack validation; a new main-based integration PR must pass its own exact-head CI before promotion.
-- The D3M-01 reviewer-authentication chain (#281, #284, #286, #288, #290, #292) remains a separate unmerged dependency. Production reviewer keys/registry are not provisioned.
+- D3M-04 through D3M-07 were promoted onto main through PR #325; the reviewer-authentication chain was subsequently integrated through PR #326. D3M-ENGINE-02 host inventory tooling was added by PR #347.
+- Current main is `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`; post-merge Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps. Its steps 138–144 cover D3M-05 runtime smoke, D3M-07 preflight, D3M-ENGINE-02 inventory and all corresponding CLI checks.
+- Production reviewer keys/registry provisioning and actual worker-host model provisioning remain separate operator/deployment gates.
 - A real worker-host TripoSR/rembg inference, independently verified GLB and human visual review have not been completed. CI uses synthetic fixtures and does not establish model accuracy.
 - Rights and model-weight licences require an explicit deployment decision. In particular, verify the selected rembg weight licence for the intended use.
 - `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false. No automatic publication or accuracy claim is made.
 
 ## D3M-01 — source-bound review and governed reviewer trust
 
-- **Integration candidate:** `integration/d3m01-main-reconciled-20261103` (PR #326, exact-head CI pending).
+- **Integrated into main:** PR #326 merged on 2026-11-03 (merge commit `fb3537d3199c98b43218b7853303858b5c9c0590`). Production reviewer keys/registry provisioning remains an operational gate.
 - Includes the BRF-05/06 local source-bound mask and architectural-observation review tools, BRF-07 evidence bundle, immutable source-bound candidate hand-off, Ed25519-signed reviewer decision receipt, and D3M-01.F/G public-key registry lifecycle/preflight.
 - Reviewer signatures bind the exact hand-off artifact, candidate GLB and geometry report. Production accepts only the versioned server-configured public-key registry; API callers cannot submit trusted keys. Revoked, expired, malformed, duplicate, orphaned or invalid key chains fail closed.
 - A valid signature proves possession of a key provisioned in the server trust registry only. It does not prove a person's civil identity, legal authority, source rights, survey accuracy or architectural correctness.
@@ -353,60 +355,478 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
 
 
-## BRF-04 — glTF scene-transformed aggregate geometry bounds (2026-11-07)
+## D3M current-main status — 2026-11-03 post D3M-ENGINE-02
 
-- Tracking issue: [#397](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/397).
-- Gap: GLB geometry QA aggregated referenced POSITION coordinates in mesh-local space and did not apply the active glTF scene node hierarchy or repeated mesh instances.
-- Candidate applies column-major node matrices or TRS composition through parent-child nodes; every active-scene mesh instance contributes to aggregate bounds while topology diagnostics remain mesh-local.
-- Safety checks validate scene graph structure and transform inputs; node traversal, mesh instances and transformed vertex evaluations are bounded. GLBs without scene metadata use an explicitly warned mesh-local fallback. Animations, skinning and morph targets remain outside static QA.
-- Evidence boundary: scene-space bounds remain un-georeferenced; topology metrics remain mesh-local. No real-world scale, survey truth, architectural accuracy or publication eligibility is implied.
-- Validation: candidate implementation is being prepared against PR #395. Exact-head Full CI and human review are required; keep all release flags false.
-
-
-## BRF-04 — glTF 2.0 sparse accessor support (2026-11-07)
-
-- Tracking issue: [#399](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/399).
-- Gap: the GLB QA adapter rejected sparse POSITION/index accessors and required dense base bufferViews, although valid glTF 2.0 assets may use zero-initialized bases plus strictly-increasing sparse replacements.
-- Candidate resolves dense or zero-initialized base values, then applies bounded sparse POSITION and index overrides before geometry/topology/scene-bounds evaluation. POSITION finiteness is validated only after sparse overlays, so only effective accessor values determine validity.
-- Validates unsigned sparse index types, strictly increasing unique index order, accessor index range, byte ranges, embedded-buffer references, no target/byteStride metadata, component alignment and tight packing. `maxSparseEntries` is an explicit memory bound.
-- Evidence boundary: this increases glTF input compatibility only; it does not prove geometry accuracy, georeferencing, survey truth or publication eligibility. PR #398 scene-transform and topology semantics remain unchanged.
-- Validation: exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged and release gates false.
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- D3M-02 and D3M-03 are integrated through PRs #302 and #324; D3M-04 through D3M-07 are integrated through cumulative PR #325; D3M-01 reviewer-authentication source is integrated through PR #326; D3M-ENGINE-02 worker-host inventory is integrated through PR #347.
+- Main post-merge Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) completed successfully (207/207 steps). The same run passed D3M-05 contract tests, D3M-07 preflight tests, D3M-ENGINE-02 host inventory test/CLI and production viewport verification.
+- This is source/automated validation only. No provisioned worker-host inventory, D3M-04 real device/cache report, D3M-05 TripoSR/rembg inference, independent GLB verification or human visual review is recorded.
+- Next operational acceptance remains: provision/review the actual worker host and local caches; run the inventory and preflight; confirm source and model rights; run one fresh D3M-05 inference; verify the exact source/GLB hashes and GLB structure; inspect the private GLB independently; save a sanitized evidence-log record.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until their separate evidence/reviewer gates are completed.
 
 
-## BRF-04 — glTF POSITION accessor min/max validation (2026-11-07)
+## 2026-11-04 — D3M-ENGINE-03 execution checkpoint
 
-- Tracking issue: [#401](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/401).
-- Gap: GLB QA consumed POSITION data but ignored the required accessor-level `min` and `max` metadata.
-- Validate both three-component finite arrays against all decoded POSITION vertices after sparse substitution. FLOAT32 declarations compare after `Math.fround`. Unreferenced POSITION entries remain part of accessor min/max even though they are excluded from referenced-only mesh bounds.
-- Preserve the glTF no-bufferView/no-sparse zero-initialized exception: bounds fields remain required for POSITION but numeric values are not compared against zero; values must remain representable as float32.
-- Evidence boundary: accessor metadata consistency only; no georeferencing, survey truth, real-world scale or architectural accuracy is implied. All release flags stay false.
-- Exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged.
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`; no milestone change has been merged to `main`.
+- Consolidated PR [#351](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/351) carries the facade/GLB work from #350, unique BRF-04 topology regression from #349 and the D3M-ENGINE-03 source-bound vertical-slice integration. Its execution branch is `feat/d3m-engine03-evidence-backed-vertical-slice-20261103`; current head at this checkpoint: `550d169a3fac0d0cb4f77ab9d9063a86d8f1da2d`.
+- Software workflow: parent report binds the source-image set, image byte hashes, rights scopes, geometry-input hash and two resumable child workflows. Child reports are bound to the exact media engine + photogrammetry strategy and exact architectural-geometry engine version, building ID, deterministic child job ID and geometry input path. Regression tests cover cross-job, cross-building and cross-profile substitution.
+- The facade-opening GLB regression now checks both footprint windings, arch geometry, zero degenerate triangles and zero non-manifold edges across all generated mesh primitives. Exact-head CI step 20 passed on `80e54a3b494f468eb57fbde13563d25d03ada698`; follow-up exact child-profile tests were added after that head and require a new exact-head validation.
+- Exact-head automated evidence on prior head `10a962601e9ed9c0c861f57bb98d0e329ade299d`: BRF-14 source-byte intake, BRF-05–07 reference intake, BRF-35 same-building linkage and P3.7 floor-plan validation succeeded. Full CI failed only in two newly added identity-guard tests because a shared mutable fixture leaked the BuildingSpec mutation from a prior test; the fixture was isolated in `550d169a3fac0d0cb4f77ab9d9063a86d8f1da2d`. Exact-head CI and renderer rerun for this latest head remain pending verification.
+- Generic renderer smoke, Real-Dhaka browser baseline, P3.6 package and BRF-45 real-asset rights admission are independent workflows. A synthetic renderer pass or byte-intake success does not prove real building accuracy or source-owner permission.
+- External blockers remain: real TripoSR/rembg host inference (issue #307), actual COLMAP/multi-view reconstruction on authorized data, model-weight/source rights decisions, independent surveyed/CAD/BIM/LiDAR truth, held-out control points, provisioned trusted reviewer signing identity, surveyed WGS84 placement and vertical datum, and real candidate Cesium browser inspection.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until the matching evidence and authorized review exist. Do not merge #351 or close #349/#350 until exact-head validation and human review are complete.
+
+## 2026-11-04 — D3M-ENGINE-03 signed publication-review hardening
+
+- Extended the existing D3M-01 Ed25519 trust primitive for D3M-ENGINE-03 catalog publication; no parallel reviewer registry or request-supplied public-key trust path was introduced.
+- Catalog publication now requires a separate signed receipt whose canonical payload binds the exact building ID, parent vertical-slice report SHA-256, source-set SHA-256, textured candidate GLB SHA-256 and publication-attestation file SHA-256.
+- The receipt must explicitly decide `approve-for-catalog-handoff`. Its reviewer ID and canonical UTC review timestamp must match the reviewer and timestamp recorded in the attestation. The signature is checked against the server-configured `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry; production mode requires the versioned public-key-only registry.
+- Invalid/missing signatures, untrusted or revoked keys, stale/changed attestation bytes, cross-building/report/source/candidate substitution, non-approval decisions and invalid review timestamps fail before the catalog write.
+- The generated catalog version retains the verified Ed25519 provenance (reviewer/key/registry IDs, public-key fingerprint, signed payload hash, signature hash and receipt-file hash). The metadata reader validates the provenance shape and exact reviewer/timestamp binding; older catalog entries without this optional field remain readable.
+- New regression coverage includes successful signed publication, required receipt/registry, tampered signature, untrusted key, changed-after-signing attestation and a validly signed hold decision. These checks prove the software contract with ephemeral test keys only; they do not onboard a real reviewer.
+- The CLI now requires `reviewReceiptPath` in its config and reads trust anchors only from the runtime environment. Never store reviewer private keys or the production registry in Git, request/config files, logs or workflow artifacts.
+- **Still blocked externally:** no production reviewer identity/authority has been onboarded, no production registry has been provisioned, and no real source/legal approval, independent surveyed truth, held-out accuracy, real worker inference or survey-backed placement is supplied. All release flags remain false.
+- **Validation:** exact-head Full CI and renderer smoke must be re-run after the signed-receipt/catalog changes. No merge to `main` is authorized by this software increment.
+### Exact-head validation checkpoint — 2026-11-04 05:20 UTC
+
+- Current branch/PR head: `d721fdbe34957fd3edb2d3d59b8858d0e9ea9f4c`.
+- Full CI [#41778202163](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778202163): 197/208 steps completed at the last poll; no failures observed. The exact reviewed vertical-slice publication test (step 38) and existing reviewed-catalog test (step 14) both completed successfully. Production build / viewport verification and evidence upload remained in progress.
+- Same-head P3.6 bounded Dhaka 3D Tiles [#41778204757](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778204757), BRF-14 byte intake [#41778207200](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778207200), and BRF-45 policy-validator [#41778209593](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778209593) succeeded.
+- Generic Blender renderer [#41778084791](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778084791) remained active at the 13-view default render stage; Real-Dhaka baseline [#41778084802](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41778084802) remained active at cold/warm browser capture. Neither result is claimed as passed.
+- These runs validate software contracts with synthetic fixture keys and benchmark inputs only. No production reviewer is provisioned; no real building visual approval, source-rights clearance, worker inference, independent truth or survey placement is supplied. PR #351 remains open/unmerged and no main promotion is authorized.
+
+## 2026-11-04 — Catalog final-read integrity / TOCTOU hardening
+
+- Audited the D3M-ENGINE-03 signed publication path through the shared `publishReviewedBuildingModel` file reads. Found a time-of-check/time-of-use gap: reviewer-signature and source/report/candidate hash checks happened in the wrapper, then the generic catalog publisher reopened the candidate GLB and publication attestation without knowing the exact hashes already checked.
+- Added optional expected-input SHA-256 guards to the generic catalog writer. It hashes the bytes actually read for the candidate and attestation and rejects any drift before it parses the attestation or writes a content-addressed GLB/manifest.
+- D3M-ENGINE-03 now passes its already-verified candidate and attestation hashes to the final writer. The D3M-02 approved-generation-job path also passes the candidate digest and the digest of the exact temporary placement attestation bytes it created, keeping the D3M-06 placement binding intact through the final filesystem read.
+- Added focused regression coverage for candidate-byte and attestation-byte drift after upstream review; both cases must leave the public catalog manifest absent. The existing approved-job and signed vertical-slice tests also exercise the updated shared writer path.
+- Documentation updated in the D3M-02 and D3M-ENGINE-03 runbooks. No release flag is enabled and no `main` merge is performed.
+- **Validation pending on the latest code head:** focused catalog, approved-job and signed vertical-slice suites plus exact-head Full CI and renderer/browser workflows. The hash guards are software integrity controls; they do not replace private workspace ACLs, trusted reviewer provisioning, source rights, independent survey truth or real GLB inspection.
+
+## 2026-11-04 — D3M-02 trusted generation-job publication review
+
+- Audited the D3M-02 `jobs/{jobId}/publish` route and confirmed that the generation review API's `reviewer` string is caller supplied. A bearer token protects the API service, but by itself it does not prove an individual reviewer identity. Before this change, an unsigned approved record with a placement binding could be sent to the catalog writer.
+- Added a separate D3M-02 Ed25519 publication-review receipt verified against the same server-controlled D3M-01 `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry used by D3M-ENGINE-03. The signed payload binds exact job/building IDs, immutable review-record SHA-256, candidate GLB SHA-256, QA-report SHA-256, reviewed placement SHA-256, reviewer ID, review timestamp and `approve-for-catalog-handoff` decision.
+- The generation publication core now rejects missing/malformed receipts, absent/unavailable trust registry, invalid/tampered signatures, untrusted/revoked keys and any cross-job/candidate/report/placement/reviewer substitution before catalog write. On success, the same Ed25519 provenance fields are persisted in the catalog version review metadata. `mapReady`, `publicationEligible`, `groundTruth`, `acceptanceEligible` and `automaticApproval` remain false.
+- Added `sign:approved-generation-job-publication-review`, a local/offline reviewer CLI. It re-hashes the exact immutable review record, candidate GLB and QA report before signing. The private key is read only from the reviewer workstation file and never sent to the app or copied into the catalog workspace. The map publish panel now accepts the JSON signature receipt; API and direct CLI both require it.
+- Added regression tests for successful signed publication, missing receipt, missing registry, tampered signature, untrusted key and signed-payload substitution. The end-to-end test invokes the offline signing CLI and then the publication CLI; CI's existing approved-generation publication step exercises the new contract.
+- Updated the D3M-02 runbook with receipt format, signing and upload procedure, error statuses and trust boundaries. No reviewer has been production-onboarded by this code change: the deployment operator must still provision a real versioned registry and establish reviewer identity/authority separately.
+- **Validation pending:** focused `test:publish-approved-generation-job`, ESLint, production build and exact-head PR/Push CI must pass on the final source head. No merge to `main` is authorized until those checks and review are complete.
 
 
-## BRF-04 — POSITION bounds before non-triangle topology skip (2026-11-07)
+## 2026-11-04 — D3M-ENGINE-04 exact worker model-artifact provenance
 
-- Tracking issue: [#403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/403).
-- Gap: the triangle-only GLB QA adapter returned early for non-TRIANGLES modes before validating their supplied POSITION accessor data and mandatory min/max metadata.
-- Validate supported POSITION accessor layout, sparse overlays, effective finite values and float32-rounded accessor bounds before the topology-mode skip.
-- Preserve triangle-only geometry counts, referenced-only aggregate bounds and topology metrics; non-triangle modes remain explicitly not counted. No POSITION attribute on a non-triangle primitive remains an explicit skip.
-- Evidence boundary: accessor-metadata coverage only; no new topology support, survey truth, georeferencing or architectural-accuracy claim. Keep all release gates false.
-- Requires exact-head Push/PR Full CI and human review; keep the child PR Draft/open/unmerged.
+- Tracking issue [#352](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/352); implementation is stacked on D3M-ENGINE-03 PR #351, not based directly on main.
+- Verified gap: D3M-ENGINE-02 recorded cached model byte lengths and TripoSR snapshot revision, but not SHA-256 of the actual TripoSR config/checkpoint or rembg weight bytes. D3M-05 did not bind model cache identity across the inference window.
+- Added worker inventory schema 1.1.0 with streaming 8 MiB SHA-256 and file identity/size/mtime/ctime checks for TripoSR config, checkpoint and active rembg weight. Missing/malformed/unstable file fingerprints fail closed; cache paths and model bytes are never written to evidence.
+- Added D3M-05 smoke schema 1.1.0 with redacted pre/post worker-host fingerprints; the smoke requires stable runner and model hashes across the workflow. Independent verifier checks schema, digest formats, byte lengths, TripoSR snapshot consistency and pre/post equality. Legacy 1.0.0 reports remain verifiable but are labelled as not containing model fingerprint evidence.
+- Added tests for generated Python probe syntax, actual chunked file hashing, malformed/missing fingerprints, before/after drift, pre-inference block and verifier tampering. Exact-head CI has not yet been run on this feature branch.
+- Hashing adds I/O proportional to model-file sizes; inventory timeout is configurable and bounded at 180 seconds. This evidence is byte identity only; it does not prove which bytes a model process opened, model authenticity/licence, successful inference or accuracy.
+- Current branch: `feat/d3m-engine04-model-artifact-provenance-20261104`; issue #352. Require exact-head Full CI and review before calling the software slice complete.
+- Real worker inference, rights decisions, independent surveyed truth, production reviewer provisioning, WGS84/vertical datum and Cesium candidate inspection remain external gates. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
+
+## 2026-11-04 — D3M-ENGINE-05 process-side model-load attestation
+
+- Audit finding: D3M-ENGINE-04's pre/post model-cache fingerprints prove byte identity at two inventory checks, but not which exact bytes the inference process hands to loader APIs. This is a distinct evidence gap, not a reason to weaken D3M-ENGINE-04.
+- Opened [issue #354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/354) and stacked branch `feat/d3m-engine05-process-model-load-attestation-20261104` on D3M-ENGINE-04 branch `feat/d3m-engine04-model-artifact-provenance-20261104` (which is itself stacked on D3M-ENGINE-03 PR #351).
+- Added Python process instrumentation for `omegaconf.OmegaConf.load` (TripoSR config), `torch.load` (TripoSR checkpoint) and `onnxruntime.InferenceSession` (rembg ONNX weights). TripoSR files are hashed and rechecked through the same descriptor handed to the loader; rembg is hashed and passed as the same immutable bytes object (maximum 512 MiB).
+- Smoke report schema is upgraded to 1.2.0; the private receipt is path-redacted and must bind all three loader roles to the pre-inference inventory hashes/byte counts. Missing/malformed/mismatched receipts fail closed. The independent verifier retains explicit legacy support for 1.0.0 and 1.1.0, but marks those reports as lacking process-side receipts.
+- Added fake Python loader tests, smoke failure tests for missing receipts, verifier tamper tests, docs and evidence template updates. These fixtures do not run real TripoSR/rembg model weights or prove host inference.
+- Compatibility caveat: the hooks instrument supported loader APIs, not kernel-level I/O. A runner/package that bypasses them cannot be attested and must fail closed; this is not signed OS/hardware attestation. rembg ONNX is buffered in memory up to 512 MiB.
+- **Exact-head software validation passed:** D3M-ENGINE-05 Full CI [#41792918173](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41792918173) completed successfully on `baea676abe09171c578671935bc16beeab2d8caf` with 209 successful steps and zero failures, including loader fixtures, smoke/verifier, ESLint, production build and production viewport API/browser verification. PR #354 remains draft/open and stacked until independent code review and its parent dependencies are resolved; this result is not real worker-host inference.
+- D3M-ENGINE-04 exact head `53f9887834cfe960ea8875d6fc7d074430400611` did pass [Full CI #41789187557](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41789187557); PR #353 remains stacked/draft and was not merged.
+- Real worker-host inference, model/source rights approval, production reviewer provisioning, independent survey/CAD/BIM/LiDAR truth, held-out checkpoints, WGS84/vertical datum and independent GLB/Cesium visual inspection remain outstanding. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
 
 
-## BRF-04 — validate glTF primitive mode enum (2026-11-07)
+## 2026-11-04 — D3M-ENGINE-06 exact source-image decoder attestation
 
-- Tracking issue: [#405](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/405).
-- Gap: GLB geometry QA treated any explicit mode other than TRIANGLES as a skippable non-triangle mode, including invalid values outside the glTF enum.
-- Default only an omitted mode to TRIANGLES (4); an explicitly present value must be a safe integer in the range 0–6 or fail closed.
-- Preserve valid non-triangle warning/skip behavior, POSITION metadata validation, triangle-only topology metrics, and explicit no-POSITION skips for valid non-triangle modes.
-- Regression coverage includes all malformed JSON value categories and omitted-mode default behavior.
-- Evidence boundary: primitive metadata validity only; no additional topology support or reconstruction-accuracy claim. All release gates remain false.
+- Tracking issue [#355](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/355); branch `feat/d3m-engine06-source-image-load-attestation-20261104`, stacked directly on D3M-ENGINE-05 PR #354 exact green head `baea676abe09171c578671935bc16beeab2d8caf`. Parent PR chain #351 → #353 → #354 remains open/unmerged.
+- Audit finding: the smoke's Node-side source hash and worker source-record hash are checked before inference, but the TripoSR Python process later opens the selected image path. That leaves a source-file TOCTOU gap at the actual image decoder boundary.
+- Added a private Python `PIL.Image.open` process hook. It binds to the exact source path passed as the runner's input argument, captures a bounded regular file with descriptor/path identity checks, verifies the pre-inference source SHA-256/byte count and passes the same captured bytes to Pillow via in-memory `io.BytesIO`. A path/hash mismatch is rejected before the original decoder runs.
+- Adds a path-redacted source-image receipt requiring exactly one event, role `sourceImage`, loader `PIL.Image.open`, exact bytes and stable identity. Smoke report schema `1.3.0` adds `sourceLoadEvidence`; the independent verifier binds the receipt to `report.source`. Schemas `1.0.0`, `1.1.0`, and `1.2.0` remain readable but are explicitly labelled as lacking this source decoder evidence.
+- Existing D3M-ENGINE-05 config/checkpoint/rembg receipts remain mandatory. Added Python fixture coverage for Pillow import patterns, repeated source opens over cached exact bytes, source digest mismatch, missing Node receipt and verifier tampering; extended the evidence log and smoke runbook.
+- **Exact-head Full CI passed:** PR run [#41796748096](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41796748096) completed successfully on final head `d5123778d4083addf477b7b4267cefd954a2250c` with 209 successful steps and zero failures. It includes all source-image loader fixtures (normal/module/dynamic Pillow imports, exact immutable bytes, source hash mismatch and substituted-path rejection), integrated runtime-smoke/report-verifier tests, ESLint, production app build, Chromium installation and production viewport API verification. Same-head Push CI #41796739940 has 199 successful steps and its viewport API step is still running at this roadmap update; do not mark that second workflow terminal until it reports success.
+- **Trust limits:** this is process-side Pillow instrumentation, not OS/hardware attestation or a sandbox. It does not prove source rights, same-building identity, architectural accuracy, scale, georeferencing, survey truth or successful representative inference. No real TripoSR/rembg worker-host inference has been run by fixture CI.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. Do not merge/retarget parent PRs #351/#353/#354 or promote this stack to `main` as part of D3M-ENGINE-06.
 
 
-## BRF-04 — bound triangle index counts in GLB geometry QA (2026-11-07)
+## 2026-11-04 — D3M-ENGINE-07 single-image generation artifact receipt
 
-- Tracking issue: [#407](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/407).
-- Gap: explicit index accessor counts without a base bufferView (including sparse-only accessors) could declare unbounded work; non-indexed primitives also create an implicit index stream.
-- Add a cumulative per-GLB `maxIndices` budget (default 15,000,000; permitted range 3–60,000,000), and reject over-cap per-stream or aggregate counts before per-index processing.
-- Apply the same budget to explicit, sparse-only and non-indexed triangle streams; report the total in `counts.indexCount`.
-- Evidence boundary: resource-safety bound only; no topology expansion, architectural accuracy, georeferencing, survey or publication claim. Keep all release gates false.
+- Tracking issue [#356](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/356); implementation branch `feat/d3m-engine07-generation-artifact-receipt-20261104`, stacked on D3M-ENGINE-06 PR #355. The D3M-ENGINE-03 → 04 → 05 → 06 parent chain remains open/unmerged.
+- Audit found that the single-image smoke had independent source/GLB hashing and geometry-QA recomputation, while D3M-05/06 recorded the exact model-loader and Pillow decoder bytes; it still lacked one separate write-once record binding these observations to the exact on-disk media-to-model workflow report.
+- D3M-ENGINE-07 introduces receipt schema `1.0.0` and smoke report schema `1.4.0`. The receipt binds building/job/source, Pillow receipt, all three model-loader receipts, stable before/after worker fingerprints, workflow-report relative path/bytes/SHA-256, GLB relative path/bytes/SHA-256/mesh count and the geometry-QA engine/status/counts/warnings. Receipt creation is exclusive and refuses an existing job receipt.
+- The independent verifier re-reads and hashes the receipt, workflow report, source and GLB; validates cross-identities and loader evidence; and recomputes geometry QA. Legacy smoke schemas `1.0.0`–`1.3.0` remain readable and are explicitly marked as having no generation artifact receipt.
+- **Trust limits:** local write-once/hash-bound JSON is not a signature, WORM storage or protection against an actor who can rewrite both report and receipt. It does not prove rights, real worker inference, accuracy, scale, georeferencing, vertical datum or survey truth. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
+- Validation state remains pending until the new branch's exact-head tests, ESLint, production build and production viewport workflow finish. CI fixtures are synthetic and must never be described as a real TripoSR/rembg host run.
+
+
+## 2026-11-04 — D3M-ENGINE-08 single-image horizontal georeference evidence
+
+- Tracking issue [#357](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/357); implementation branch `feat/d3m-engine08-georeference-evidence-binding-20261104`, stacked on D3M-ENGINE-07 PR #356.
+- Verified gap: `runMediaToModelWorkflow` supported optional `controlPoints` and the existing `registerModelToWgs84` horizontal similarity transform, but the single-image runtime smoke/CLI did not expose it. The D3M-ENGINE-07 receipt also did not store/recompute the control-point registration evidence.
+- D3M-ENGINE-08 adds an optional workspace-contained control-point manifest bound to the exact building ID, selected source ID and source-image SHA-256. The manifest declares WGS84/EPSG:4326 horizontal coordinates, survey method/reference/date and operator-declared horizontal accuracy; each control point identifies the selected image. The manifest is hashed before the workflow and re-read after generation to reject drift.
+- Exact points and configured residual thresholds are passed into the existing registration function. Smoke schema 1.5.0 and artifact receipt schema 1.1.0 bind the manifest pointer, registration result and GLB SHA-256. The independent verifier re-reads the manifest, recomputes registration and checks workflow/report/receipt cross-bindings. No-control-point runs are explicitly marked not-requested; schemas through smoke 1.4.0 and receipt 1.0.0 remain supported.
+- Trust boundary: control-point and survey metadata are operator-supplied, not authenticated. The result is horizontal and human-review-only; vertical height datum remains not-solved. This does not prove model-feature correspondences, survey truth, architectural accuracy, source rights or authorize Cesium publication. Keep groundTruth, acceptanceEligible, publicationEligible, mapReady and automaticApproval false.
+- Exact-head CI/review remains pending until the D3M-ENGINE-08 branch validation completes; synthetic tests are not real worker inference or survey evidence.
+
+
+## 2026-11-04 — D3M-ENGINE-09 signed review-package georeference binding
+
+- Tracking issue [#358](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/358); branch `feat/d3m-engine09-signed-georeference-review-package-20261104`, stacked on the exact D3M-ENGINE-08 PR #357 head `43ee2816d01941b01883686a146b6d9afc2f7f5c`.
+- Audit finding: D3M-08 bound the GCP manifest and recomputed horizontal registration into the private single-image smoke and generation receipt, but the final building review-package builder did not ingest those source artifacts. A signed review manifest could therefore omit the single-image registration hand-off.
+- Added a byte-based D3M-08 georeference verifier shared by the workspace and offline package verification paths. The package builder can optionally require and independently verify a fresh D3M-08 smoke, then copy its exact smoke report, generation-artifact receipt, workflow report and control-point manifest bytes into the final review package.
+- The review manifest binds the exact job/building/source/candidate and four artifact hashes. The offline verifier enforces an all-or-none evidence group, checks receipt and workflow cross-bindings, and recomputes the horizontal fit from the packaged manifest bytes. Existing no-single-image review packages remain supported.
+- Added focused tests for offline control-manifest byte verification, package metadata binding, and rejection of a partial single-image evidence group. The complete optional evidence hand-off still requires exact-head CI and code review before this increment can be called validated.
+- Trust boundary remains unchanged: the control points are operator-supplied; surveyor/device authenticity and physical point correspondence are not proven. The vertical datum remains unresolved, and all map/publication/automatic-approval flags remain false. No real worker inference or survey accuracy is claimed.
+
+
+## 2026-11-04 — D3M-ENGINE-10 registry-bound review-package signatures
+
+- Tracking issue [#359](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/359); branch `feat/d3m-engine10-registry-bound-review-package-signatures-20261104`, stacked on D3M-ENGINE-09 PR #358 at its exact then-current head `f31b8918f0923c8cc9fa7da63b4506801efdfcc8`.
+- Audit finding: D3M-ENGINE-09 makes the GCP-bound review manifest signable, but the existing detached signature envelope v1 accepts a separately supplied PEM public key and does not record `reviewerId`, `keyId`, `registryId`, registry expiry, key validity or revocation state.
+- Added signature envelope schema 2.0.0. The domain-separated Ed25519 message authenticates exact manifest bytes plus canonical signer metadata and explicit purpose `package-integrity-attestation-not-release-approval`.
+- V2 signing and verification reuse the existing strict `parseTrustedReconstructionReviewerKeys` parser. Signing derives the public key from the local private key and checks its fingerprint against exactly one active reviewer registry entry. Verification resolves reviewer/key/registry identity against the current active registry and fails closed on missing/invalid/expired registry, unknown/revoked/expired key, metadata substitution, future signed time, manifest drift or signature tampering.
+- Added a registry-driven sign CLI, strict registry-driven signature verification CLI, and unified signed-package command that runs both package artifact integrity and detached signature verification. New CLI signing never silently downgrades to legacy v1. Existing v1 verification remains available only with an explicit legacy public-key option.
+- Added synthetic registry/key tests for positive verification, wrong/missing signer, mismatched private key, registry/key expiry and revocation, signer metadata/context tampering, manifest/signature changes, schema contract and CLI secret-redaction/legacy paths. Production secrets or personal identities are not added to source/CI.
+- Trust boundary: registry membership establishes possession of an operator-provisioned key, not civil identity, professional qualification, legal authority, surveyor authenticity, architectural accuracy or release approval. The signature purpose is package-integrity attestation only. Keep `mapReady`, `publicationEligible` and `automaticApproval` false.
+- **Validation pending:** focused new signature/CLI tests, ESLint, production build and exact-head Push/PR Full CI must pass on the final source head. Do not mark the increment validated or merge the dependency chain until both exact-head workflows finish.
+
+
+## 2026-11-04 — D3M-ENGINE-11 signing-time package integrity preflight
+
+- Tracking issue [#360](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/360); branch `feat/d3m-engine11-signing-integrity-preflight-20261104`, stacked on D3M-ENGINE-10 PR #359 exact head `bfbcde08c2657a359bdc3dd9afbed5d4f308cee0`.
+- Audit finding: D3M-10's registry-bound signing CLI checked manifest release-policy booleans and reviewer key binding, but it did not run offline package integrity verification on the actual files before issuing the detached signature. An incomplete/tampered package could be signed even though the combined verifier would later reject it.
+- Added shared `building-review-package-directory.mjs` inventory used by standalone integrity CLI, the v2 signing CLI and combined verifier. It rejects symlinks/special files/unsafe paths, uses no-follow descriptor reads where supported, checks path/descriptor identity and size/mtime/ctime stability, and computes exact byte hashes plus a snapshot token.
+- The signer now runs full `verifyBuildingReviewPackage` before signing, requires zero integrity errors, writes the signature exclusively, then re-inventories/re-verifies and checks that the package snapshot did not change. If it detects signing-window drift, it removes only the still-identical signature file it created and fails closed.
+- Warning-only review packages remain signable for human review only when no integrity error exists; warnings are reported and never interpreted as acceptance. Combined verification and standalone integrity use the same inventory helper as signing.
+- Added tests for stable snapshot hashing/change, symlinked root/manifest/artifact, non-directory root, unsafe filenames, and CLI refusal to sign incomplete package content without leaving a signature. Existing v2 signer/verifier and v1 explicit legacy tests remain in place.
+- **Validation pending:** focused filesystem/signature CLI tests, ESLint, production build, and exact-head Push/PR Full CI must finish successfully before the increment is considered validated.
+- Trust limits unchanged: a snapshot is not an OS-level filesystem lock and cannot prevent privileged writes after signing. Keep the package under controlled write access and rerun combined verification after transfer. Signature/registry do not prove civil identity, reviewer authority, legal rights, survey truth, vertical datum or architecture accuracy. Keep mapReady/publicationEligible/automaticApproval false.
+
+
+## 2026-11-04 — D3M-ENGINE-12 stable signature verification snapshot
+
+- Tracking issue #361; branch `feat/d3m-engine12-stable-signature-verification-20261104`, stacked on D3M-ENGINE-11 PR #360 exact head `91f75bd85797a2f19c7d0516adff2958a9a4429d`.
+- Audit gap: combined verification read the detached signature through a separate path and did not re-inventory the package after cryptographic verification.
+- Added a root-control-file reader using the shared descriptor-pinned no-follow reader; signature envelope reads now reject symlinks and identity/size/time drift.
+- Combined verification re-inventories after signature verification and requires both package snapshot token and exact signature bytes/file identity to remain unchanged.
+- Added focused control-file stable-read and symlink/path rejection tests; CI and documentation updated.
+- **Validation pending:** focused tests, lint, production build and exact-head Push/PR Full CI. This is mutation detection during verification, not an OS-level lock or evidence of survey truth/reviewer authority. All release gates remain false.
+
+
+## 2026-11-04 — D3M-ENGINE-12 stable signature verification hardening
+
+- Re-audit found two gaps in the initial implementation: (1) package-manifest bytes were read before the artifact walk but not reread afterward; (2) combined verification only compared signature bytes and device/inode, not full stat identity, and its final inventory/signature reads ran concurrently.
+- The inventory reader now rereads the manifest after artifact traversal and requires exact bytes plus full descriptor/path identity to remain unchanged. File identity includes device, inode, size, mtime, ctime and mode.
+- The detached signature control file is restricted to 64 KiB and is read with the shared no-follow descriptor reader.
+- Combined verification now serially takes two post-crypto package inventories and two post-crypto signature reads. Both package snapshots must match the initially integrity-verified snapshot; signature bytes and full file identity must match on every observation.
+- Added full synthetic package materialization + v2 Ed25519 registry signature + combined CLI success test, followed by artifact tampering rejection. Added signature-file identity/mode/size tests and size-limit/path rejection tests. Fake fixture image headers now expose deterministic dimensions to the same filesystem inventory parser.
+- **Exact-head validation passed:** D3M-ENGINE-12 Push CI [#41846770503](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41846770503) and PR CI [#41846777075](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41846777075) both completed successfully on `ead57eb9808c8589069abbe06c321600acbff44f`, 214/214 steps each with zero failures. PR #361 remains Draft/open/unmerged, stacked on PR #360. This detects observed changes during the verifier window but is not an OS-level lock; reverify after transfer and keep the directory under controlled write access.
+
+
+- Added an injectable deterministic verification-window guard and tests proving unchanged observations pass while package snapshot drift or signature bytes/metadata drift fail closed. This tests the exact serial observation contract without relying on timing-sensitive background file mutation.
+
+
+- Extended stable filesystem reads to the explicitly supplied legacy v1 trusted public-key PEM. The verifier now uses descriptor-pinned no-follow reads, compares descriptor/path identity and bounds the file to 16 KiB; added symlink, oversize and exact-byte tests.
+
+
+## 2026-11-04 — D3M-ENGINE-13 surveyed ellipsoidal-height evidence
+
+- Tracking issue [#362](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/362); branch `feat/d3m-engine13-ellipsoidal-height-evidence-20261104`, stacked on the exact D3M-ENGINE-12 head `ead57eb9808c8589069abbe06c321600acbff44f`. D3M-ENGINE-12 PR #361 remains Draft/open/unmerged; this increment is not promoted to `development` or `main`.
+- Verified gap: D3M-08 registered horizontal X/Z with WGS84 controls and deliberately returned `vertical.status=not-solved`. This could not establish an absolute surveyed vertical origin for the exact generated GLB.
+- Added control-point manifest schema 1.1.0 with an optional all-or-none vertical section. It requires EPSG:4979 WGS 84 3D ellipsoidal heights in metres, named WGS 84 realization/reference frame, decimal coordinate epoch, vertical survey metadata and one-to-one vertical observations for every existing horizontal control ID. Heights in orthometric/MSL/geoid/AGL or unknown datums are rejected.
+- Added deterministic vertical offset and residual computation. It reuses the exact horizontal `metresPerModelUnit` and fits only `heightOffsetM`; no independent Y scale is allowed. The default thresholds are 0.5 m RMS and 1.0 m maximum residual, and a vertical threshold failure makes the single-image smoke fail closed.
+- Smoke schema 1.6.0 and generation receipt schema 1.2.0 bind the extended georeference evidence. The independent verifier recomputes vertical evidence from the exact control manifest bytes; the final review-package builder carries the vertical evidence digest/summary, and the offline package verifier checks it against the packaged smoke/receipt/workflow/manifest and exact candidate GLB.
+- Added fixtures for valid vertical offset, scale reuse, residual failure, insufficient vertical spread, wrong CRS/height type, unnamed frame, missing/duplicate/substituted control IDs, non-finite/out-of-range heights, manifest drift, offline byte verification and review-package metadata policy. Added operator documentation at [D3M-ENGINE-13 ellipsoidal-height evidence](D3M-ENGINE-13-ELLIPSOIDAL-HEIGHT-EVIDENCE.md).
+- **Exact-head validation passed:** final head `e6d652bb8e63e68295828d64ca5d6d563cf72597`; Push Full CI [#41853559045](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41853559045) and PR Full CI [#41853571597](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41853571597) both completed successfully with 214/214 steps and zero failures. Both include the vertical GCP/runtime/package tests, ESLint, production build, Chromium and production viewport API/browser verification. PR #362 is Draft/open/unmerged on D3M-ENGINE-12 PR #361; no development/main promotion.
+- **Trust boundary:** vertical observations and physical model-point correspondences are still operator-supplied and not independently authenticated. No geoid/vertical transformation to orthometric/MSL height is included. A horizontal or vertical fit does not prove source rights, surveyor authenticity, model architecture, façade accuracy or real TripoSR inference. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
+
+
+## D3M-ENGINE-14 — independent held-out 3D checkpoint validation
+
+- Tracking issue: [#363](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/363).
+- Branch: `feat/d3m-engine14-independent-3d-checkpoints-20261104`, stacked directly on the D3M-ENGINE-13 feature head.
+- Implemented schema 1.2.0 fitting-observation identities and 6–100 disjoint held-out 3D checkpoint declarations; deterministic horizontal/vertical/combined residual computation; smoke fail-closed guard; review-package metadata and offline integrity binding; synthetic negative and positive tests.
+- **Exact-head software validation passed:** code/test head `66ae2f03f5bc9303d2734e7641039f4afa06c95b`; Push Full CI [#41978812826](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41978812826) and PR Full CI [#41978818407](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41978818407) both passed 214/214 steps with zero failures. The end-to-end held-out review-package/offline integrity suite passed 22/22 tests; ESLint, production build, Chromium, production viewport API, Dhaka benchmarks and CI evidence uploads also passed.
+- **Trust boundary remains:** no real held-out field-book/GNSS bytes, surveyor authentication, independently reviewed physical feature correspondence or live single-image worker run has been provided. Synthetic fixtures prove software calculations and package binding, not real-world accuracy.
+- All release/publication flags remain false. PR #363 remains Draft/open/unmerged and stacked on PR #362; no promotion to `development` or `main`.
+
+
+## D3M-ENGINE-15 — byte-verified held-out survey observation records
+
+- Tracking issue [#364](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/364); branch `feat/d3m-engine15-byte-verified-survey-records-20261105`, stacked on D3M-ENGINE-14 PR #363 exact base `e88aea72e270d6413caa8d7b092290f3162fb215`.
+- Closes the D3M-14 observation-record trust gap: held-out checkpoint `observationRecordSha256` declarations now require the original bytes at deterministic workspace paths `evidence/survey-observations/<observationId>.record`. Arbitrary manifest-supplied file paths are not accepted.
+- Preparation uses stable no-follow reads, verifies each declared SHA-256, rechecks the bytes before package completion, and carries originals unchanged as `single-image-survey-observation-record` artifacts. Per-record size is capped at 16 MiB and total record bytes at 128 MiB; checkpoint count remains 6–100.
+- Single-image review-package metadata schema 1.3.0 records the count, total bytes and canonical inventory digest. Offline verification reconstructs the expected path from the exact D3M-14 manifest, checks each record against its checkpoint hash and actual package bytes, and rejects missing/orphaned/tampered records or inventory drift. Metadata 1.0.0–1.2.0 remains backward-compatible without record artifacts.
+- Focused regression includes a byte-backed package fixture, missing/tampered record rejection, inventory digest tampering and explicit legacy 1.2.0 verification. Synthetic bytes establish software behavior only, not authentic GNSS data or a real building accuracy result.
+- **Exact-head validation passed:** current code/test head `4fa635adc3db4c44903bbbc78c896216a27f8b92`; Push Full CI [#41983277779](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41983277779) and PR Full CI [#41983283682](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41983283682) both completed successfully with 214/214 steps and zero failed/cancelled steps. Lint, production build, offline review-package integrity, production viewport verification, Dhaka browser/performance checks and evidence uploads all passed. PR #366 remains Draft/open/unmerged and stacked on #363; no promotion to `development` or `main`.
+- Trust boundary unchanged: exact bytes are hash-bound but are not independently authenticated. Surveyor/receiver authenticity, CRS/frame/epoch validity and physical checkpoint-to-GLB correspondence still require independent review. All release/publication flags remain false.
+
+
+## 2026-11-05 — D3M-ENGINE-16 survey observation attribution attestations
+
+- Tracking issue [#367](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/367); Draft PR [#368](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/368); branch `feat/d3m-engine16-surveyor-record-attestations-20261105`, stacked on D3M-ENGINE-15 PR #366 at exact base `4fa635adc3db4c44903bbbc78c896216a27f8b92`.
+- Implemented a separate public-key-only trusted-surveyor registry parser and strict registry/attestation JSON Schemas. The registry enforces bounded canonical data, Ed25519 keys, validity/revocation, unique IDs/fingerprints and linear key-rotation history. It is distinct from the reconstruction reviewer registry.
+- Implemented domain-separated, canonical Ed25519 sign/verify functions that bind exact observation/checkpoint/building IDs, opaque record SHA-256/byte length, exact D3M-14 control-manifest SHA-256, surveyor/key/registry context, validity windows and canonical signing time.
+- Added operator-local `sign:survey-observation-attribution` CLI. It verifies the exact smoke/manifest and record bytes, creates deterministic write-once sidecars, self-verifies, and rechecks source evidence after signing. Private keys remain local; registry comes from external `SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON`.
+- Integrated review preparation, package schema `1.4.0`, sidecar artifact inventory and offline current-registry signature verification. Missing, extra, orphaned, renamed, substituted, wrong-key, revoked-key or tampered sidecars fail closed. D3M-15 schema `1.3.0` remains byte-only and backward compatible.
+- Added adversarial core tests and a six-observation end-to-end signed-package regression. The fixtures use ephemeral synthetic Ed25519 keys and synthetic bytes only. They do not establish field authenticity or building accuracy.
+- **Exact-head validation:** PR Full CI [#41993614343](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41993614343) has passed ESLint, offline review-package integrity (including D3M-16 signed sidecar e2e), D3M-16 registry/signature regression and signing CLI help validation. Push Full CI [#41993606995](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41993606995) is running. Both runs target exact code head `abb058b36a33e1badd89d1ee1f133922f5e019c9`; terminal Full CI results remain pending.
+- **External production blockers:** no real surveyor identity/key is provisioned and no genuine surveyor-signed field record has been received. Organization-led identity/qualification onboarding and external registry deployment remain required.
+- All release/publication flags remain false. PRs #363 and #366 remain Draft/open/unmerged; PR #368 remains Draft/open/unmerged and stacked on #366. No promotion to `development` or `main`.
+
+
+## D3M-ENGINE-17 — trusted survey-device key association (2026-11-05)
+
+**Tracking:** [Issue #369](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/369)  
+**Implementation branch:** `feat/d3m-engine17-device-record-attestations-20261105`  
+**Stack base:** D3M-ENGINE-16 PR #368 exact head `99863add8b32a70d693930afa3195d256b4b4e21`.
+
+D3M-15 preserves exact original held-out observation bytes; D3M-16 separately verifies a surveyor-key attribution signature. D3M-17 adds a distinct device-key association statement over the same record bytes, manifest hash, observation/checkpoint/building context and an external device enrollment registry.
+
+The external registry is public-key-only and separate from reviewer and surveyor trust. It contains opaque device/manufacturer/model identifiers, an organization-keyed HMAC-SHA-256 device serial commitment digest, an enrollment-evidence digest, Ed25519 public keys, bounded validity/revocation and linear key rotation. The new sidecar path is `evidence/survey-observations/<observationId>.device-attestation.json`; the package metadata version is 1.5.0 when both D3M-16 and D3M-17 registries and sidecars are verified. Legacy package schemas 1.0.0–1.4.0 remain unchanged.
+
+**Trust boundary:** the external enrollment authority is responsible for generating a non-reversible, keyed serial commitment and validating enrollment records. This code verifies the supplied digest binding, registry lifecycle and signature; it does not validate a manufacturer certificate, secure element, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy. Do not treat an enrollment-evidence digest as a certificate chain. CI uses synthetic keys only. All publication/map-ready/automatic-approval flags remain false.
+
+D3M-17 stays stacked on #368 and must not be merged or promoted independently of D3M-14/#363, D3M-15/#366 and D3M-16/#368. Exact-head CI and package-level negative tests are required before considering this increment validated.
+
+
+### D3M-ENGINE-17 validation addendum — 2026-11-05
+
+- **Exact-head software validation passed:** code/test head `0cbfd93de9886ad2bfe7d6dfe86d64405750823d`; Push Full CI [#41999290514](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41999290514) and PR Full CI [#41999297857](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41999297857) both completed successfully with 218/218 steps and zero failed/cancelled steps. Both exact-head runs include device registry/signature tests, end-to-end package-integrity regression, CLI validation, ESLint, production build, Chromium and production viewport API/browser verification.
+- The initial signature failure was traced to the trusted registry parser storing the `publicKey` helper instead of the parsed Ed25519 `KeyObject`; the parser now stores `publicKey: key`. Focused registry/signature tests and package-integrity regression pass.
+- Trust boundary remains unchanged: CI uses synthetic keys; no manufacturer certificate, secure-element custody, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy is proven. All publication/map-ready/automatic-approval flags remain false.
+- PR #370 remains Draft/open/unmerged, stacked on #368. Do not promote this stack to `development` or `main` before independent review and external enrollment evidence.
+
+## D3M-ENGINE-18 — authority-signed survey-device hardware enrollment evidence
+
+- **Tracking issue:** [#371](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/371).
+- **Implementation branch:** `feat/d3m-engine18-signed-device-enrollment-evidence-20261105`; stacked on D3M-ENGINE-17 PR #370 exact head `3cde93738045e47da1b09e453573ed6bedda61a3`.
+- Verifies an exact-byte, canonical, domain-separated Ed25519 **device-level** hardware-enrollment statement. Its SHA-256 must match the one stable `enrollmentEvidenceSha256` value shared across the device's D3M-17 key-rotation history.
+- Important D3M-17 compatibility finding: D3M-17 deliberately requires `enrollmentEvidenceSha256` to remain stable when a device key rotates. Therefore the enrollment statement does **not** bind an individual device key ID/fingerprint. D3M-17 remains responsible for device-key possession, validity, revocation and rotation.
+- Adds a separate public-key-only enrollment-authority registry, validity/revocation and linear key-rotation checks, and binding to device ID, manufacturer/model and privacy-preserving keyed serial commitment.
+- Adds an offline bounded-input CLI that rejects symlinks and changing files and prints only sanitized verification results. The authority registry is an operator-provisioned trust anchor, separate from reviewer/surveyor/device registries. An operator-assigned `manufacturer` authority type does not prove legal manufacturer identity or certificate-chain validation.
+- Adds schemas, synthetic-key adversarial tests including D3M-17 key-rotation reuse, CLI tests, CI test/help wiring and runbook `docs/D3M-ENGINE-18-DEVICE-ENROLLMENT-EVIDENCE.md`.
+- **Scope limit:** this increment verifies a device-level external signed evidence document but does not yet embed it in review-package schema 1.6.0 or make it a release/publication gate. No production authority key, device serial, enrollment document or signing secret is included. It does not prove secure-element custody, manufacturer certification, firmware integrity, genuine capture or measurement accuracy.
+- **Validation status:** the initial key-specific binding design was corrected to preserve the D3M-17 rotation invariant. Exact-head Push/PR Full CI must pass before validation is claimed.
+- PR #370 and its dependency chain #368 → #366 → #363 remain Draft/open/unmerged. Do not merge, retarget or promote this stack to `development`/`main`. All publication/map-ready/automatic-approval flags remain false.
+
+## D3M-ENGINE-19 — bind signed device enrollment evidence into review packages
+
+- **Tracking issue:** [#373](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/373).
+- **Implementation branch:** `feat/d3m-engine19-review-package-enrollment-evidence-20261105`; stacked on D3M-ENGINE-18 PR #372 exact head `eaf3caabdd6825342d6948c70ee01d4185b49077`.
+- Extends single-image evidence package metadata to schema 1.6.0 when D3M-17 device attestations and D3M-18 enrollment evidence are both present. Carries exactly one original evidence document for every distinct device identity referenced by the held-out device-attestation sidecars.
+- Package preparation reads deterministic `evidence/device-enrollments/<deviceId>.enrollment.json` files using the existing bounded stable no-follow reader, verifies exact document SHA-256 against the active D3M-17 device registry entry and checks the D3M-18 authority signature. The inventory digest and authority registry ID are bound into package metadata and artifact inventory.
+- Offline package verification independently reconstructs the unique device-ID set from packaged D3M-17 sidecars and repeats D3M-18 verification against both current trust registries. Missing, extra/orphaned, tampered, wrong-device-identity, wrong-authority and stale-digest evidence fail closed.
+- Preserves schema 1.5.0 as device-key-attested only and schemas 1.0.0–1.4.0 unchanged. Schema 1.6.0 does not authorize release or publication.
+- Adds synthetic end-to-end positive/negative coverage, inventory determinism tests, operator runbook `docs/D3M-ENGINE-19-REVIEW-PACKAGE-ENROLLMENT-EVIDENCE.md` and exact branch filters in Full CI.
+- **Validation status:** D3M-19 uses one immutable device-level enrollment statement per distinct device ID, preserving the D3M-18 key-rotation invariant. Exact-head Push/PR Full CI must pass after contract alignment; no CI or real enrollment-evidence pass is claimed until both terminal results are successful.
+- PR #372 remains Draft/open/unmerged, stacked on #370 → #368 → #366 → #363; all are still Draft/open/unmerged. Keep this stack review-only and do not promote it to `development`/`main`. All release/publication/map-ready/automatic-approval flags remain false.
+
+
+## D3M-ENGINE-20 — exact external trust-registry snapshot binding
+
+- **Tracking issue:** [#376](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/376).
+- **Implementation PR:** [#377](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/377), Draft/open/unmerged; branch `feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105`.
+- **Exact validated head:** `30e4e0c4158cbc4256701df30a8d067d8e5f927b`; exact stack base is D3M-19 PR #374 head `b5f5f86f7efa6a3e31e3a8aad8a6281d3542ace1`.
+- Binds exactly three external registries—D3M-16 surveyor, D3M-17 device and D3M-18 enrollment-authority—using exact UTF-8 bytes, role/type, registry ID, schema version, byte length and SHA-256. Each registry is limited to 64 KiB and the aggregate to 192 KiB.
+- Single-image package schema `1.7.0` is emitted after D3M-16/17/18 evidence and all three registries are verified. Offline verification independently re-hashes the exact registry strings and cross-binds IDs to each evidence verifier.
+- **Exact-head software validation passed:** Push Full CI [#42020324585](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42020324585) and PR Full CI [#42020440794](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42020440794) both completed successfully on the exact head above. ESLint, snapshot tests, package-integrity e2e, production build and production viewport API verification step #212 passed; no failed/cancelled steps were reported.
+- PR #377 had no submitted reviews or review threads at the audit. Keep it Draft/open/unmerged and do not promote the stack to `development`/`main`.
+- **Trust boundary:** exact-byte digests identify which registry bytes were supplied; they do not authenticate registry authorship or prove legal identity, hardware custody, genuine capture or measurement accuracy. CI uses synthetic data only. All release/publication/map-ready/automatic-approval flags remain false.
+
+## D3M-ENGINE-21 — signed trust-registry governance and anti-rollback
+
+- **Tracking issue:** [#378](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/378).
+- **Implementation PR:** [#379](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/379), Draft/open/unmerged; branch `feat/d3m-engine21-signed-trust-registry-governance-20261105`.
+- **Exact validated head:** `105900ba490931b8b571e5ebab378afd112278c8`; stacked on D3M-20 PR #377 at `30e4e0c4158cbc4256701df30a8d067d8e5f927b`.
+- Adds a detached, domain-separated Ed25519 governance attestation over the exact D3M-20 snapshot schema, digest, aggregate byte count and ordered registry IDs.
+- The statement binds a registry-set ID, positive sequence, validity timestamps, governance key ID and SPKI fingerprint. Offline/package verification requires an independently pinned public key and operator-maintained minimum sequence; a key embedded in the statement is never trusted as the trust anchor.
+- Package schema `1.8.0` requires the signed statement, pinned key and sequence floor. Package preparation and offline verification both re-check the statement against the exact D3M-20 snapshot. Schemas `1.0.0`–`1.7.0` retain prior semantics.
+- Added module `src/core/building-generation/trust-registry-governance-attestation.mjs`, strict JSON Schema, synthetic-key positive/negative tests, package-integrity e2e rollback test, environment wiring, CI branch filters/test step and operator runbook `docs/D3M-ENGINE-21-TRUST-REGISTRY-GOVERNANCE.md`.
+- **Exact-head software validation passed:** Push Full CI [#42024476713](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42024476713) and PR Full CI [#42024484339](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42024484339) both completed successfully on the exact head above. Each had 222/222 completed steps, zero failed steps, including governance unit tests, package-integrity e2e, ESLint, production build and viewport API verification.
+- PR #379 had no submitted reviews or review threads at the audit. Keep it Draft/open/unmerged and do not promote the stack to `development`/`main`.
+- **Trust boundary:** This verifies signed registry-set governance and an operator-configured floor. It does not establish the key holder's legal identity or authority, secure HSM custody, manufacturer certification, physical receiver authenticity, genuine capture, firmware integrity, CRS correctness or survey/building measurement accuracy. CI uses synthetic data only. All ground-truth, acceptance, publication, map-ready and automatic-approval flags remain false.
+
+## D3M-ENGINE-22 — persisted governance sequence state
+
+- **Tracking issue:** [#380](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/380).
+- **Implementation branch:** `feat/d3m-engine22-persisted-governance-state-20261105`; stacked directly on D3M-21 PR #379 exact starting head `105900ba490931b8b571e5ebab378afd112278c8`.
+- Adds strict state envelope schema `1.0.0`, bound to the registry-set ID and independently pinned governance public-key fingerprint. State records the minimum accepted sequence, revision, last accepted attestation/snapshot digests, update time, prior-state digest and current-state digest.
+- State bootstrap requires an explicit operator-provided D3M-21 minimum floor. Missing bootstrap floor, corrupt/malformed state, key/registry-set substitution, symlink, permissive file mode, lock contention, stale compare-and-set revision, sequence downgrade and same-sequence equivocation fail closed.
+- Atomic updates use an exclusive lock, bounded no-follow private-file reads, fsync, atomic rename and previous-state digest chaining. Package-directory verification optionally loads the persisted state using `SURVEY_TRUST_REGISTRY_GOVERNANCE_STATE_FILE`, verifies against max(configured floor, persisted floor), and advances the state only after full package-integrity success.
+- Existing D3M-21 static-floor mode remains available when no state-file path is configured. The local file helps routine restart persistence and corruption detection but cannot resist an attacker who restores an older filesystem snapshot. Production adversarial rollback resistance still requires a hardware monotonic counter or remotely anchored compare-and-set provider; neither provider is provisioned here.
+- Added module `src/core/building-generation/trust-registry-governance-state.mjs`, strict JSON Schema, focused persistence/CAS/replay tests, package-directory schema-1.8 integration test, CI step and operator runbook `docs/D3M-ENGINE-22-PERSISTED-GOVERNANCE-STATE.md`.
+- **Exact-head software validation passed:** focused state tests and package-integrity e2e passed; Push Full CI [#42026997173](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42026997173) and PR Full CI [#42027153600](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42027153600) both completed successfully on exact head `9d5b759b4f8eecfdc0d4346f957a850cc62df169`. The local file remains vulnerable to hostile filesystem snapshot rollback; this is software validation only, not production anti-rollback assurance.
+- Keep D3M-22 Draft/open/unmerged, stacked on #379 → #377 → #374 → #372 → #370 → #368 → #366 → #363. Do not merge, retarget, mark ready or promote any parent branch to `development`/`main`. Ground truth, acceptance, publication, map-ready and automatic-approval remain false.
+
+
+
+## D3M-ENGINE-23 — external monotonic governance-state provider contract
+
+- **Tracking issue:** [#382](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/382).
+- **Implementation branch:** feat/d3m-engine23-external-monotonic-store-provider-20261105; stacked on D3M-22 PR #381 exact starting head 9d5b759b4f8eecfdc0d4346f957a850cc62df169.
+- Adds injectable provider adapter at src/core/building-generation/trust-registry-governance-external-store.mjs. The narrow provider interface exposes read, initialize-if-absent and compare-and-set operations; each response binds the state document to an independent anchor containing revision, minimum accepted sequence and exact state digest.
+- The adapter rejects malformed provider envelopes, identity/key substitution, anchor/state mismatch (including a restored older state document paired with a newer anchor), stale version tokens, non-advancing write versions, provider write conflicts, sequence downgrade and same-sequence equivocation. The review-package directory verifier accepts the external adapter as an explicit dependency and rejects simultaneous external-store/local-file configuration.
+- D3M-22 local-file mode remains available for local/offline development. The D3M-23 test provider is an in-memory synthetic fixture only; it is not a deployed remote service or hardware monotonic counter.
+- Provider obligations are documented: atomic/linearizable CAS; anchor persistence independent from the state document; durable monotonic revision/floor protected against snapshot restore; authenticated transport and client identity; key custody, recovery and operational monitoring. The consumer adapter cannot prove that an operator-supplied provider actually meets these obligations.
+- Adds strict provider-snapshot schema, focused adversarial provider tests, package-integrity verifier integration coverage and dedicated Full CI wiring.
+- **Exact-head software validation passed:** focused external-provider tests and offline package-integrity end-to-end tests passed. Push Full CI [#42040021662](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42040021662) and PR Full CI [#42040026136](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42040026136) both completed successfully on exact head `6a5110f27be641155c9c270a728f5fb50fbcd858`; each reported 224/224 successful steps, zero failed steps and zero cancelled steps. Both included ESLint, the D3M-23 external-store provider test, offline review-package integrity e2e, and production viewport API verification. This proves software/CI behavior only; it does not prove that an actual independently operated provider is provisioned, durable or resistant to hostile provider-side rollback. Do not claim production rollback resistance until a real provider is provisioned, independently reviewed and tested.
+- Keep the D3M-23 PR Draft/open/unmerged, stacked on #381 → #379 → #377 → #374 → #372 → #370 → #368 → #366 → #363. Do not merge, retarget, mark ready or promote any stack branch to development/main. Ground-truth, acceptance, publication, map-ready and automatic-approval remain false.
+
+
+### D3M-ENGINE-23 exact-head validation addendum — 2026-11-05
+
+- **Exact PR/branch head confirmed:** PR #383 head and branch ref both resolve to `6a5110f27be641155c9c270a728f5fb50fbcd858`; base is D3M-22 PR #381 head `9d5b759b4f8eecfdc0d4346f957a850cc62df169`.
+- Push Full CI [#42040021662](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42040021662) and PR Full CI [#42040026136](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42040026136) both completed `success` for that same exact SHA. Each job completed 224/224 steps with zero failed or cancelled steps; D3M-23 provider tests, offline review-package integrity, ESLint and production viewport API verification all passed.
+- PR #383 remains Draft/open/unmerged and mergeable; issue #382 remains open. The PR has no submitted reviews, review threads or conversation comments and no requested reviewers at this audit. No merge, retarget, ready-for-review transition or promotion was performed.
+- The provider contract and synthetic in-memory fake are validated as software. No actual remote CAS service, independently persisted rollback-resistant anchor, TPM/HSM counter, production credentials or external security review has been provisioned. All ground-truth, acceptance, publication, map-ready and automatic-approval flags remain false.
+
+
+## D3M-ENGINE-24 — external governance provider conformance and concurrency harness
+
+- **Tracking issue:** [#384](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/384).
+- **Implementation branch:** `feat/d3m-engine24-provider-conformance-20261105`; stacked on D3M-23 PR #383 at starting head `aace04cda98f1d22893b48a6b40340a5985a8f2f` (the D3M-23 roadmap-validation documentation commit).
+- Adds reusable test helper `tests/helpers/trust-registry-governance-provider-conformance.mjs` and a focused suite. The harness validates eight-way initialize-if-absent contention, eight competing CAS writers with exact winner state/version/anchor returned to every loser, stale-write rejection, read-after-write, full registry-set/key identity isolation, exact independent-anchor agreement, provider version non-advancement and historical-token (ABA) rejection.
+- Barrier-controlled negative fixtures force check-then-write initialization races and competing CAS writes after every contender has observed the same pre-commit version. Additional fixtures reject cross-identity record aliasing, providers keyed only by either member of the registry identity tuple, stale-conflict responses with the wrong provider version, and initial or post-write anchor rollback.
+- Repeated initialize-if-absent with a conflicting candidate state must preserve the existing state, version and anchor; a negative fixture proves that resetting an existing record is rejected.
+- CAS independently enforces both preconditions: a wrong version with the exact current digest and a current version with the wrong prior-state digest are each rejected without changing state, version or anchor.
+- Ambiguous-write cases cover response loss after commit (recognize exact committed state without replay), timeout before commit (read the exact prior state/version/anchor before one safe retry), and a competing writer committing during timeout (identify the different winner and never replay the timed-out intent).
+- The synthetic negative suite also checks incomplete provider interfaces, malformed provider version tokens and version-token reuse. The helper is intended to be reused by future provider-specific integration suites with a dedicated isolated namespace.
+- Adds `npm run test:trust-registry-governance-provider-conformance`, D3M-24 push/PR Full CI branch filters and a dedicated CI step, plus `docs/D3M-ENGINE-24-PROVIDER-CONFORMANCE.md`. D3M-23 runbook now references the new suite.
+- **Exact-head software validation passed:** Push Full CI [#42337017403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337017403) and PR Full CI [#42337019776](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337019776) both completed `success` on exact head `786d901e5a7ed4effddbbbb563533820276fb4ba`. Each job completed 225/225 successful steps with zero failed/cancelled steps, including D3M-24 conformance, ESLint, production build, production viewport API verification and all six evidence uploads. This validates the software harness only; the provider fixture remains synthetic.
+- **Scope limit:** tests use a deterministic in-memory synthetic provider. The helper cannot prove remote-store linearizability, anchor independence/durability, provider-side rollback resistance, disaster recovery or real TPM/HSM custody. No provider, credentials, endpoint or hardware counter is provisioned. Ground-truth, acceptance, publication, map-ready and automatic-approval remain false.
+- Keep D3M-24 Draft/open/unmerged, stacked on D3M-23 #383 → D3M-22 #381 → D3M-21 #379 and its predecessors. Do not merge, retarget, mark ready or promote any stack branch to `development`/`main`.
+
+## D3M-ENGINE-25 — external provider qualification evidence gate
+
+- **Tracking issue:** [#385](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/385).
+- **Draft implementation PR:** [#386](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/386), stacked on D3M-24 PR #384; D3M-24 parent base is the exact branch head `786d901e5a7ed4effddbbbb563533820276fb4ba`.
+- Adds strict schema `trust-registry-governance-provider-qualification.schema.json`, evidence evaluator `src/core/building-generation/trust-registry-governance-provider-qualification.mjs`, CLI `scripts/validate-trust-registry-governance-provider-qualification.mjs`, focused tests and a current-state manifest.
+- The manifest binds provider identity to privacy-safe instance/namespace fingerprints and an HTTPS origin, exact source commit, D3M-24 Push/PR full-run and focused-conformance results, a separate non-synthetic provider integration run, and hash/byte-count-bound deployment/security artifacts.
+- Required evidence includes concurrent atomic bootstrap/CAS, multi-client linearizability, real process restart, ambiguous-write recovery, independent anchor custody, backup/restore rollback challenges, authenticated client identity, TLS, least privilege, key custody/rotation, audit retention, operational recovery and independent security review.
+- The evaluator rejects synthetic-only provider evidence, mismatched run/source SHA, missing or failed evidence, wrong/duplicate artifact references, unsafe paths, symlinks, byte-count mismatches and SHA-256 mismatches. Byte hashing proves artifact integrity, not truth or signer authenticity.
+- The checked-in current-state manifest is structurally valid but intentionally **blocked**: no real external provider or provider-specific integration run is provisioned; all 13 evidence classes remain missing. D3M-24 Push Full CI [#42337017403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337017403) and PR Full CI [#42337019776](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337019776) subsequently completed `success` on exact source SHA `786d901e5a7ed4effddbbbb563533820276fb4ba`, each with 225/225 successful steps and zero failed/cancelled steps. The original manifest snapshot predates the terminal Push result.
+- The evaluator can return only `blocked` or `ready-for-independent-review`; `productionQualificationEligible`, acceptance, publication, map-ready and automatic-approval stay false even for a complete bundle.
+- **Latest fully verified exact head before final hardening:** `b500a7e5c457f0fab4418f082d2b0d5ee20e9cf3`; Push Full CI [#42338892262](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42338892262) and PR Full CI [#42338897822](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42338897822) both completed `success`, each with 227/227 successful steps, including D3M-25 focused tests, blocked-fixture validator, production build, production viewport API verification and evidence uploads. Earlier failed/cancelled runs on superseded SHAs are retained as history but are not acceptance evidence.
+- Final hardening adds a required provider-integration full-workflow conclusion (in addition to its focused suite), locks both D3M-24 conformance records to synthetic provenance, schema-enforces independent-audit provenance for independent security review, and exercises the CLI's bounded/symlink-safe manifest and report paths. Exact-head Push and PR Full CI must rerun after this change.
+
+
+
+### D3M-ENGINE-25 exact-head post-hardening validation addendum — 2026-11-07
+
+- The final hardened exact head `85ce324122ce1f789422121dc9d5239651e96fe0` is now fully validated: Push Full CI [#42340151217](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340151217) and PR Full CI [#42340154740](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340154740) both completed `success`, each with 227/227 successful steps, zero failed steps and zero pending steps. The production viewport API verification and all six evidence-upload steps passed in both exact-head runs.
+- PR #386 remains Draft/open/unmerged, stacked on D3M-24 PR #384. D3M-24's exact base head remains `786d901e5a7ed4effddbbbb563533820276fb4ba`.
+- This is software/CI validation only. The external provider remains unprovisioned, the provider-specific integration run remains not-run, all 13 evidence classes remain missing, and every qualification/release flag remains false.
+
+## D3M-ENGINE-26 — process-isolated external provider conformance runner
+
+- **Tracking issue:** [#387](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/387).
+- **Implementation branch:** `feat/d3m-engine26-process-isolated-provider-conformance-20261107`, created from the exact D3M-25 PR #386 head `85ce324122ce1f789422121dc9d5239651e96fe0`.
+- **Gap addressed:** D3M-24's `reopenProvider()` verifies a newly constructed client object, but its checked-in fixture shares an in-memory closure. D3M-25 requires genuine process-restart visibility evidence; a new object alone is insufficient.
+- Adds a process-isolated provider proxy and worker protocol that instantiate the operator-supplied adapter and execute every read/initialize/CAS operation in a fresh Node child process. The existing D3M-24 conformance helper is reused without changing its contract.
+- The runner checks the adapter entry file's exact SHA-256 before every import, requires a regular non-symlink module, bounds requests/responses and execution time, kills timed-out workers, uses an explicit environment-variable allowlist, and suppresses adapter output/error messages that may disclose secrets.
+- Adds a temporary file-backed synthetic provider fixture using inter-process locking and atomic rename. CI exercises concurrent bootstrap/CAS and cross-process read-after-exit against it; the fixture keeps state and anchor in the same file and is not a production provider or independent anchor.
+- Adds focused negative coverage for symlinked/invalid adapters, missing factory exports, hung workers, oversized results, secret-bearing adapter exceptions and unsafe runtime environment injection.
+- The sanitized report binds the adapter entry-file hash, provider ID, source commit and child-process execution mode. An adapter's `syntheticOnly` declaration is metadata only and is not independent proof.
+- **Exact-head software validation passed:** implementation code head `28b5005c6bd46e7886ac5175469bfd63b32033e1`; Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156) both completed `success` on that same SHA with 229/229 successful job steps and zero failed/cancelled steps. Both runs passed ESLint, D3M-23/24/25 regressions, D3M-26 process-isolated conformance and CLI tests, production build, production viewport API/browser/performance verification, and all six evidence uploads.
+- Keep D3M-26 Draft/open/unmerged and stacked on D3M-25 PR #386; do not merge, retarget, mark ready or promote any branch to `development`/`main`.
+
+
+### D3M-ENGINE-26 exact-head validation addendum — 2026-11-07
+
+- PR #388 and its branch ref were confirmed at exact implementation SHA `28b5005c6bd46e7886ac5175469bfd63b32033e1`, stacked on D3M-25 PR #386 exact base `85ce324122ce1f789422121dc9d5239651e96fe0`.
+- Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156) both completed `success`; each job had 229/229 successful steps, zero failed steps and zero cancelled steps.
+- The process-isolated D3M-24 suite, malformed protocol and adapter-hash negative cases, worker timeout/size/secret-handling tests, CLI report/provenance tests, D3M-25 blocked-evidence invariant, production build, production viewport API verification and six existing CI evidence uploads all passed in both runs.
+- This is software conformance evidence using the local file-backed synthetic fixture only. The fixture's state and anchor are stored together; it does not prove a real remote provider, independent anchor custody, rollback resistance or production security. No production provider, credentials, endpoint, TPM/HSM counter or independently administered anchor is provisioned. D3M-25 qualification stays blocked and all release/publication/map-ready/automatic-approval flags remain false.
+- PR #388 remains Draft/open/unmerged, stacked on #386. No merge, retarget, review request or branch promotion was performed.
+
+
+## D3M-ENGINE-27 — process-isolated provider qualification report bridge
+
+- **Tracking issue:** [#389](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/389).
+- **Implementation branch:** `feat/d3m-engine27-process-qualification-report-bridge-20261107`, created from D3M-26 PR #388 exact head `759de62b503ad40a4b8283b4cc7ca69a27afbc44`.
+- **Gap addressed:** D3M-26 emits a source-bound process-isolated report, while D3M-25 previously accepted a process-restart artifact after byte hashing only. A correctly hashed report could still refer to another provider, adapter, source commit or deployment namespace.
+- Adds D3M-26 process-report schema 1.1.0 and a semantic validator binding source commit, provider ID, adapter module SHA-256, synthetic declaration, privacy-safe provider-instance/namespace fingerprints, fresh-child-process execution mode, unique worker counts and the D3M-24 conformance outcomes.
+- Extends the D3M-26 CLI with optional privacy-safe instance/namespace fingerprints for synthetic adapters and mandatory paired fingerprints for non-synthetic adapters. Reports still contain no endpoints, secrets, account/tenant identifiers or local module paths.
+- Extends D3M-25 qualification schema 1.1.0 with the exact adapter SHA-256 and process-report artifact ID. The D3M-25 verifier checks artifact path/size/hash and then validates the report semantics against the qualification manifest. The same artifact ID must appear in `evidence.processRestartVisibility`.
+- Schema 1.0.0 remains parseable, but legacy manifests claiming a passed provider integration receive a `provider-process-report-not-bound` blocker and cannot reach `ready-for-independent-review`.
+- The checked-in provider-qualification manifest was versioned to 1.1.0 with null adapter/report links; no provider, fingerprints, report or external integration run were fabricated. The fixture must remain blocked and all release flags false.
+- Adds strict report schema, positive and adversarial semantic tests, backwards-compatibility checks, D3M-25 artifact verification integration, npm script, branch filters for Push/PR and a dedicated Full CI test step.
+- **Trust boundary:** the CI adapter remains a file-backed synthetic provider. Hash and semantic validation do not authenticate a report signer, prove a real provider, establish independent anchor custody or prove provider-side rollback resistance. No remote provider, secrets, endpoint, TPM/HSM counter or independent anchor is provisioned. D3M-25 remains blocked.
+- **Validated code head:** `b2698fca594e9330c4b8bbda60e51792a1976217`. A schema-alignment regression in the first full run was corrected in the schema assertion: it now selects the `passed` rule that actually carries the provider-instance and namespace fingerprint constraints. The correction is test-only; the process-report validator and D3M-25 gate were not weakened.
+- **Exact-head Full CI passed:** Push [#42345632592](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42345632592) and PR [#42345637202](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42345637202) both completed `success` on the exact SHA above. Each job completed all 229 workflow validation steps (230 total job steps including post-job wrappers), with zero failed/cancelled/incomplete steps.
+- Both runs passed ESLint; D3M-24 provider conformance; D3M-26 process-isolated conformance; D3M-27 CLI-generated report-to-D3M-25 artifact-verification E2E; D3M-25 qualification regression and blocked-fixture validator; production build; Chromium installation; production viewport API/browser/performance verification; and six map/performance evidence-upload steps. The generated Ahsan Manzil GLB artifact was also uploaded in both runs.
+- Push and PR runs each uploaded seven artifacts: generated Ahsan Manzil GLB, P2.3 camera alignment, P2.4 cold/warm performance, P2.5 repeatability, P2.6 dynamic map workload, multi-tile viewport workload/Playwright diagnostics, and P3.4 map-panel visual evidence.
+- **Trust boundary unchanged:** CI's process-report E2E uses the file-backed synthetic provider. D3M-25 current qualification remains blocked; no actual provider, integration run, independent monotonic anchor, production credentials, signer identity or rollback-resistance evidence is provisioned. All production qualification, release, acceptance, publication, map-ready and automatic-approval flags remain false.
+- PR #390 remains Draft/open/unmerged, stacked on PR #388 exact base `759de62b503ad40a4b8283b4cc7ca69a27afbc44`. No merge, retarget, branch promotion or provider provisioning was performed.
+
+## D3M-ENGINE-28 — trusted signatures for process-isolated provider reports
+
+- **Tracking issue:** [#391](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/391).
+- **Implementation branch:** `feat/d3m-engine28-signed-process-report-attestation-20261107`, created from D3M-27 PR #390 exact head `571b864037d728370bc11dc6504f8d8a8106c588`.
+- **Gap addressed:** D3M-27 validates exact report bytes and provider semantics, but its report is unsigned. Hash integrity does not authenticate who produced/attested to that report.
+- Adds a domain-separated Ed25519 detached signature contract for the exact D3M-26 report bytes and the source SHA, provider ID, adapter hash, synthetic declaration, instance/namespace fingerprints.
+- Signer identity, key ID, registry ID, fingerprint, revocation and validity are resolved only from the versioned trusted-reviewer registry. Legacy key arrays are not accepted. Private keys are read from a protected file; registry JSON and key material are never printed or passed on the command line.
+- Adds a bounded create-once signing CLI; report inputs are limited to 1 MiB, signature envelopes to 64 KiB, symlinked key/report/output paths are rejected, and the detached signature is written with exclusive creation and restrictive file permissions.
+- D3M-25 schema 1.2.0 requires a linked `process-report-signature` artifact for every passed provider integration. Signature and report artifacts must share the exact provider-integration workflow URL and source commit. The evaluator verifies the Ed25519 signature against the currently active trusted registry key before the process report may count as verified evidence.
+- D3M-25 schemas 1.0.0 and 1.1.0 remain readable. A passed integration under either legacy schema is blocked from `ready-for-independent-review` because no D3M-28 signature binding exists.
+- The checked-in current-state manifest is upgraded to schema 1.2.0 with null process-report and signature links. Provider remains `not-provisioned`; integration remains `not-run`; all 13 evidence classes remain missing. No reviewer private key, production identity, provider, endpoint or signature evidence is fabricated.
+- CI includes focused positive/adversarial signature tests and CLI help validation on the D3M-28 push/PR branch filters.
+- **Trust boundary:** a trusted reviewer signature authenticates exact report bytes and the signer key identity only. It does not independently prove a report's claims, provision a remote provider, establish independent anchor custody, prove provider rollback resistance, or qualify production. All production qualification, acceptance, publication, map-ready and automatic-approval flags remain false.
+- **Final security hardening:** the signing CLI rejects symlinked parent directories for report/key inputs and rejects POSIX private-key files readable by group/other; D3M-25 requires exactly one process-restart report in verified restart evidence—the exact report with its verified signature. CI contains adversarial coverage for both cases.
+- Keep D3M-28 Draft/open/unmerged, stacked on D3M-27 PR #390; do not merge, retarget or promote to `development`/`main`.
+
+
+
+### D3M-ENGINE-28 exact-head Full CI validation addendum — 2026-11-07
+
+- Final implementation/test head `19254bdc1ed29aee4c952bdd8661aba3a49ead89` is fully validated by exact-head **Push Full CI** [#42349916912](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349916912) and **PR Full CI** [#42349920655](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349920655). Both runs completed `success` against that same SHA.
+- Each run completed 232/232 job steps successfully, including post-job cleanup. There were zero failed, cancelled, skipped or incomplete steps.
+- Both runs passed ESLint, the D3M-26 report-binding suite, D3M-28 trusted-signer positive/adversarial and CLI tests, D3M-25 qualification/legacy-compatibility/blocked-manifest checks, production build, Chromium installation, production viewport API/browser/performance verification, and all six evidence upload steps.
+- Each run uploaded seven non-expired artifacts: Ahsan Manzil generated GLB, P2.3 camera alignment, P2.4 render performance, P2.5 performance repeatability, P2.6 dynamic-map workload, multi-tile viewport/Playwright diagnostics, and P3.4 map-panel visual evidence.
+- The final security tests explicitly reject extra unsigned process-restart reports in verified evidence, symlinked report/key parent directories, and POSIX private-key files with group/other access.
+- PR #391 remains Draft/open/unmerged, based on D3M-27 PR #390 exact head `571b864037d728370bc11dc6504f8d8a8106c588`. D3M-27 PR #390 and all parent PRs remain Draft/open/unmerged; no branch was retargeted or promoted.
+- **Trust boundary unchanged:** the signer tests use ephemeral test keys and a synthetic report/provider. The real external provider remains not provisioned/not run, all 13 qualification evidence classes remain missing, and production qualification, acceptance, publication, map-ready and automatic-approval all remain false. These CI results prove the software verification path, not a production provider or the truth of provider claims.
+
+
+## D3M-ENGINE-29 — independent-anchor challenge–response witness
+
+- **Tracking issue:** [#392](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/392).
+- **Implementation branch:** `feat/d3m-engine29-independent-anchor-witness-20261107`, created from D3M-28 PR #391 exact head `048f7d883cacd450a94315ca55281bbaddcc3b0f`.
+- **Gap addressed:** D3M-28 authenticates exact D3M-26 process-report bytes and reviewer-key identity. It does not prove that the monotonic-state anchor is independently operated or that the reported state was freshly observed for this exact provider identity. D3M-25's `independentAnchorCustody` evidence was previously a generic byte-hashed audit artifact.
+- **Protocol:** create a fresh 256-bit nonce and bounded (1–600 second) challenge bound to exact source SHA, provider ID, adapter SHA-256, privacy-safe instance/namespace fingerprints and the exact byte-verified/D3M-28-signed D3M-26 process-report SHA-256, final revision and minimum accepted sequence. The independent anchor returns a detached Ed25519 witness binding those exact report values plus challenge bytes, nonce, anchor/key/registry identities, registry-set ID, independently pinned governance-key fingerprint, provider version, positive anchor monotonic sequence and authoritative-state digest.
+- **Trust registry:** a dedicated versioned, public-key-only independent-anchor registry is supplied through operator-controlled `D3M29_INDEPENDENT_ANCHOR_KEYS_JSON`. It validates active/revoked lifecycle, validity windows, unique identities/fingerprints and explicit key replacement chains. The anchor private key is never accepted by the application or stored in the repository. The registry governance-key fingerprint must also match the independently supplied `D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256` environment pin; the registry cannot declare its own trust root.
+- **D3M-25 integration:** qualification manifest schema 1.3.0 binds separate `anchor-witness-challenge` and `anchor-independence-review` artifacts to the exact provider integration run/source commit. A verified `independentAnchorCustody` claim must reference only the exact witness as `independent-audit` evidence; the evaluator verifies challenge freshness, both artifact hashes/bytes, provider context, active anchor key and Ed25519 signature. Schemas 1.0.0–1.2.0 remain readable, but legacy hash-only verified anchor claims are blocked.
+- **Files:** `src/core/building-generation/trust-registry-governance-provider-anchor-witness.mjs`, `trust-registry-governance-provider-anchor-witness.schema.json`, challenge and verification CLIs, D3M-25 evaluator/schema, current blocked manifest, focused unit/integration tests, package scripts, CI branch filters and `docs/D3M-ENGINE-29-INDEPENDENT-ANCHOR-WITNESS.md`.
+- **CI coverage:** D3M-29 focused tests plus CLI-help checks are wired to Push and Pull Request Full CI for this branch. Exact-head Push/PR Full CI has not yet been recorded in this roadmap checkpoint; do not state the milestone is validated until both terminal runs succeed on the same final SHA.
+- **Trust boundary:** CI uses ephemeral test-only Ed25519 keys and synthetic fixtures. No real external provider, independent anchor, production public-key registry, remote monotonic counter, TPM/HSM, production credentials or independent security review is provisioned. A valid witness signature authenticates the configured key's statement over exact fresh challenge bytes; it does not establish real-world independence or guarantee provider-side rollback resistance. D3M-25 remains blocked, all 13 evidence classes remain missing in the checked-in manifest, and production qualification/acceptance/publication/map-ready/automatic-approval remain false.
+- **Branch rules:** Keep D3M-29 Draft/open/unmerged and stacked on D3M-28 PR #391. Preserve all D3M-25–28 parent PRs Draft/open/unmerged. Do not merge, retarget, mark ready or promote any stack branch to `development` or `main`.
+
+
+### D3M-ENGINE-29 exact-head Full CI validation addendum — 2026-11-07
+
+- **Final validated implementation head:** `ba3defda33f1d62d3bd2eb699937e33d4c5eb401` on `feat/d3m-engine29-independent-anchor-witness-20261107`, stacked on D3M-28 PR #391 exact base head `048f7d883cacd450a94315ca55281bbaddcc3b0f`.
+- **Push Full CI:** [#42371910696](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42371910696) — terminal `success`, exact head SHA above.
+- **PR Full CI:** [#42371915404](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42371915404) — terminal `success`, exact same head SHA.
+- Each run completed **235/235 workflow-job steps** successfully. No failed, skipped, cancelled, pending or incomplete steps remained in either final run.
+- Both runs passed ESLint, D3M-29 challenge/registry/witness unit tests, D3M-25 schema-1.3.0 and exact process-report/witness integration tests, prior D3M-24–28 provider conformance/signature gates, all repository test suites, production Next.js build, Chromium setup, production viewport API checks, cold/warm and repeatability benchmarks, geospatial API tests and Playwright browser verification.
+- Each final run uploaded seven non-expired evidence artifacts: Ahsan Manzil generated GLB; P2.3 fixed-camera alignment; P2.4 cold/warm render performance; P2.5 repeated performance baseline; P2.6 dynamic map workload; multi-tile viewport/Playwright diagnostics; and P3.4 map-panel visual evidence.
+- D3M-29 adversarial cases include expired/revoked keys, wrong anchor key, substituted provider/report SHA or final revision, stale challenge, canonical JSON and duplicate registry keys, mismatched operator-pinned governance fingerprint, altered governance-registry signature, and altered anchor witness signature.
+- **Software validation is complete for this exact head. Operational qualification is not.** CI uses ephemeral synthetic Ed25519 keys/fixtures only. No real provider, independent anchor, operator-signed production anchor registry, HSM/TPM, remote monotonic counter or out-of-band ownership review has been provisioned. The checked-in D3M-25 manifest remains blocked with all 13 evidence classes missing; production qualification, acceptance, publication, map-ready and automatic-approval remain false.
+- PR #393 remains Draft/open/unmerged and stacked on PR #391. Parent PRs #391, #390, #388, #386, #384 and earlier D3M stack PRs remain Draft/open/unmerged. No PR was merged, no branch was retargeted/promoted, and `development`/`main` were not changed.
+- Keep tracking issue #392 open until the real independent provider/anchor, public governance registry and witness have been provisioned and verified. Do not interpret CI-only cryptographic fixtures as proof of real-world independent custody.
+
+
+## 2026-11-08 — Current-main integration candidate
+
+- **Main baseline:** `74e702b70bafc4d7fbf4163de6aadd864aa4e3e4` (the GLB-QA hardening release from PR #408).
+- **Integration branch:** `integration/d3m-engine29-mainline-20261108`.
+- **Imported engine source:** `feat/d3m-engine29-independent-anchor-witness-20261107` at `e580af850c09e7de9f6ecf462ee872a8f3e90df9`. This is the cumulative D3M-ENGINE-03 through D3M-ENGINE-29 dependency stack; D3M-02 through D3M-07 and D3M-ENGINE-01/02 are already present on Main and are not re-imported as separate stale branches.
+- **Additional video evidence fix:** PR #342's three intended files are included: capture-manifest validation, its regression tests, and the capture-manifest runbook. Raw videos no longer count as independent view coverage until linked extracted frames exist.
+- **Main QA preservation:** the ten current-main GLB-QA files from PR #408 were deliberately retained from Main rather than copied from the older stacked branch. This keeps the latest sparse-accessor, scene-bounds, topology, and baseline-defect hardening.
+- **Facade implementation decision:** the imported D3M-ENGINE-03 generator already builds per-floor/per-edge wall panels with through-wall structural openings and keeps the generated result review-required. The older PR #350 helper implementation is not duplicated into this stack. PR #340's historical coordinate-frame migration is excluded pending a separate frame/placement compatibility review.
+- **Validation status:** PR #393 records successful Push/PR CI on its earlier head `ba3defda33f1d62d3bd2eb699937e33d4c5eb401`; the current source ref is `e580af850c09e7de9f6ecf462ee872a8f3e90df9`, so that older result is not treated as validation of this integration. The integration PR must pass exact-head Full CI before it can be merged.
+- **Operational boundary:** worker/model cache provisioning, real TripoSR/COLMAP inference, independent surveyed dimensions/controls, production provider/anchor provisioning, source rights, and human visual review remain separate requirements. This integration does not enable `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady`, or `automaticApproval`.
+

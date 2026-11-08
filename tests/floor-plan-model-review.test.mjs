@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -15,6 +15,10 @@ import {
   REQUIRED_FLOOR_PLAN_REVIEW_CHECKS,
 } from "../src/core/building-generation/floor-plan-model-review.mjs";
 import { getActivePublishedModels, validatePublishedModelCatalog } from "../src/core/building-generation/published-model-catalog-reader.mjs";
+import {
+  canonicalFloorPlanPublicationReviewBytes,
+  createFloorPlanPublicationReviewSubmission,
+} from "../src/core/building-generation/floor-plan-publication-review.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-floor-plan-geometry.json", import.meta.url), "utf8"));
 const PDF_BYTES = Buffer.from("%PDF-1.7\nreview lifecycle floor plan fixture\n", "utf8");
@@ -83,6 +87,57 @@ const publication = {
   forwardAxis: "Z",
 };
 
+function makeTestRegistry(publicKeyPem) {
+  const now = Date.now();
+  return JSON.stringify({
+    schemaVersion: "1.0.0",
+    recordType: "reconstruction-trusted-reviewer-key-registry",
+    registryId: "floor-plan-publication-test-registry",
+    issuedAtUtc: new Date(now - 60_000).toISOString(),
+    expiresAtUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    entries: [{
+      reviewerId: "reviewer-operator",
+      keyId: "floor-plan-test-key-01",
+      status: "active",
+      publicKeyPem,
+      validFromUtc: "2026-10-01T00:00:00.000Z",
+      validUntilUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  });
+}
+
+async function makeSignedPublicationReceipt(setup, t) {
+  const originalRegistry = process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  const keyPair = generateKeyPairSync("ed25519");
+  const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = makeTestRegistry(publicKeyPem);
+  t.after(() => {
+    if (originalRegistry === undefined) delete process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+    else process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = originalRegistry;
+  });
+
+  const directory = path.join(
+    setup.root, ".building-engine", "floor-plan-candidates",
+    setup.candidate.buildingId, setup.candidate.candidateId,
+  );
+  const reviewBytes = await readFile(path.join(directory, "review.json"));
+  const attestationBytes = await readFile(path.join(directory, "attestation.json"));
+  const reviewRecord = JSON.parse(reviewBytes.toString("utf8"));
+  const submission = createFloorPlanPublicationReviewSubmission({
+    reviewRecord,
+    reviewRecordSha256: hash(reviewBytes),
+    publicationAttestationSha256: hash(attestationBytes),
+  });
+  const signatureBase64 = sign(
+    null,
+    canonicalFloorPlanPublicationReviewBytes(submission),
+    keyPair.privateKey,
+  ).toString("base64");
+  return { submission, signatureBase64 };
+}
+
 function reviewInput(setup, decision = "approved", overrides = {}) {
   const checks = Object.fromEntries(REQUIRED_FLOOR_PLAN_REVIEW_CHECKS.map((key) => [key, true]));
   return {
@@ -148,15 +203,19 @@ test("records an immutable approved review and publishes only through the explic
     (error) => error.code === "REVIEW_ALREADY_RECORDED",
   );
 
+  const reviewReceipt = await makeSignedPublicationReceipt(setup, t);
+  const expectedReceiptSha256 = hash(Buffer.from(JSON.stringify(reviewReceipt, null, 2) + "\n", "utf8"));
   const published = await publishReviewedFloorPlanModelCandidate({
     workspaceRoot: setup.root,
     buildingId: setup.candidate.buildingId,
     candidateId: setup.candidate.candidateId,
-    publishedAt: "2026-10-22T14:05:00.000Z",
+    reviewReceipt,
+    publishedAt: new Date(Date.now() + 60_000).toISOString(),
   });
   assert.equal(published.modelId, publication.modelId);
   assert.equal(published.assetUrl.startsWith("/models/generated/"), true);
   assert.equal(published.sha256, setup.candidate.modelSha256);
+  assert.equal(published.reviewerAuthentication.signedReviewReceiptSha256, expectedReceiptSha256);
   assert.equal(published.mapReady, false);
   assert.equal(published.publicationEligible, false);
 
@@ -164,7 +223,8 @@ test("records an immutable approved review and publishes only through the explic
     workspaceRoot: setup.root,
     buildingId: setup.candidate.buildingId,
     candidateId: setup.candidate.candidateId,
-    publishedAt: "2026-10-22T14:06:00.000Z",
+    reviewReceipt,
+    publishedAt: new Date(Date.now() + 120_000).toISOString(),
   });
   assert.equal(repeatedPublish.alreadyPublished, true);
   assert.equal(repeatedPublish.versionId, published.versionId);

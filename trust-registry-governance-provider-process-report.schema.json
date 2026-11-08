@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-provider-process-report:1.1.0",
+  "title": "D3M-26 process-isolated provider conformance report",
+  "description": "Sanitized report contract. It binds process-level software claims to source and provider fingerprints but does not authenticate deployment or prove independent anchor custody.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sourceCommitSha",
+    "providerId",
+    "adapterModuleSha256",
+    "adapterDeclaredSyntheticOnly",
+    "providerInstanceFingerprintSha256",
+    "providerNamespaceFingerprintSha256",
+    "executionMode",
+    "processIsolationVerified",
+    "workerProcessesStarted",
+    "uniqueWorkerInstances",
+    "uniqueWorkerProcessIds",
+    "conformance",
+    "trustBoundary"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.1.0"
+    },
+    "sourceCommitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "providerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "adapterModuleSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "adapterDeclaredSyntheticOnly": {
+      "type": "boolean"
+    },
+    "providerInstanceFingerprintSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "providerNamespaceFingerprintSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "executionMode": {
+      "const": "fresh-node-child-process-per-provider-operation"
+    },
+    "processIsolationVerified": {
+      "const": true
+    },
+    "workerProcessesStarted": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "uniqueWorkerInstances": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "uniqueWorkerProcessIds": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "providerId",
+        "initializeContenders",
+        "initializeWinners",
+        "casContenders",
+        "casWinners",
+        "staleCasRejected",
+        "freshProviderReopened",
+        "freshReadMatched",
+        "ambiguousCommitRecovered",
+        "preCommitTimeoutSafeRetry",
+        "ambiguousCompetingWinnerDetected",
+        "identityIsolationVerified",
+        "finalRevision",
+        "finalMinimumAcceptedSequence"
+      ],
+      "properties": {
+        "providerId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+        },
+        "initializeContenders": {
+          "const": 8
+        },
+        "initializeWinners": {
+          "const": 1
+        },
+        "casContenders": {
+          "const": 8
+        },
+        "casWinners": {
+          "const": 1
+        },
+        "staleCasRejected": {
+          "const": true
+        },
+        "freshProviderReopened": {
+          "const": true
+        },
+        "freshReadMatched": {
+          "const": true
+        },
+        "ambiguousCommitRecovered": {
+          "const": true
+        },
+        "preCommitTimeoutSafeRetry": {
+          "const": true
+        },
+        "ambiguousCompetingWinnerDetected": {
+          "const": true
+        },
+        "identityIsolationVerified": {
+          "const": true
+        },
+        "finalRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "finalMinimumAcceptedSequence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "trustBoundary": {
+      "const": "Software conformance only. Adapter declarations are not independently authenticated. This report does not prove provider deployment, independent anchor custody, rollback resistance, security controls or production durability."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "adapterDeclaredSyntheticOnly": {
+            "const": false
+          }
+        },
+        "required": [
+          "adapterDeclaredSyntheticOnly"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerInstanceFingerprintSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "providerNamespaceFingerprintSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adapterDeclaredSyntheticOnly": {
+            "const": true
+          }
+        },
+        "required": [
+          "adapterDeclaredSyntheticOnly"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerInstanceFingerprintSha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "providerNamespaceFingerprintSha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

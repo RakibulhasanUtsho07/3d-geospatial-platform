@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-attestation:1.0.0",
+  "title": "Signed survey trust-registry governance attestation",
+  "description": "Detached Ed25519 approval for the exact D3M-20 three-registry snapshot. The verifier public key and minimum sequence must be pinned independently outside this document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "recordType", "signaturePurpose", "algorithm",
+    "registrySetId", "sequence", "issuedAtUtc", "expiresAtUtc",
+    "governanceKeyId", "governanceKeyFingerprintSha256",
+    "snapshotSchemaVersion", "snapshotCount", "snapshotTotalBytes",
+    "snapshotSha256", "registryIds", "signatureBase64"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "recordType": { "const": "trusted-survey-registry-governance-attestation" },
+    "signaturePurpose": { "const": "approve-exact-survey-trust-registry-snapshot-only" },
+    "algorithm": { "const": "Ed25519" },
+    "registrySetId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "issuedAtUtc": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+    "expiresAtUtc": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+    "governanceKeyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "governanceKeyFingerprintSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "snapshotSchemaVersion": { "const": "1.0.0" },
+    "snapshotCount": { "const": 3 },
+    "snapshotTotalBytes": { "type": "integer", "minimum": 3, "maximum": 196608 },
+    "snapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "registryIds": { "type": "array", "minItems": 3, "maxItems": 3,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" } },
+    "signatureBase64": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" }
+  }
+}
