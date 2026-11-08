@@ -6,7 +6,7 @@
 
 ## Scope and safety
 
-The worker accepts 3–120 distinct, non-duplicate JPEG/PNG images or extracted video-frame images for one building. Use genuine overlapping views of the same building, with sufficient viewpoint variation; three files are only the minimum input count, not a promise of reconstructability. The worker rejects duplicate image content and source records that do not match the BuildingSpec identity, asset hash, licence and operation scopes.
+The durable queue contract used by this procedure accepts 3–100 selected views. The lower-level COLMAP worker has an internal 120-image ceiling, but the queue request schema caps the submitted source array and viewSourceIds at 100. Use 3–100 distinct, non-duplicate JPEG/PNG images or extracted video-frame images for one building. Use genuine overlapping views of the same building, with sufficient viewpoint variation; three files are only the minimum input count, not a promise of reconstructability. The worker rejects duplicate image content and source records that do not match the BuildingSpec identity, asset hash, licence and operation scopes.
 
 Every selected source must have a reviewed permission basis and the required scopes: **private-media-ingestion**, **photogrammetry-reconstruction**, and **texture-baking**. The owner/operator must separately attest source rights, operation scopes, same-building identity, overlap review and source up-axis. These are explicit operator attestations; they are not independent legal clearance, automated building-identity verification or survey proof. Do not use images whose rights do not permit the intended reconstruction/texture operations.
 
