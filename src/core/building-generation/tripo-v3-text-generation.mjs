@@ -9,7 +9,7 @@ export const TRIPO_V3_DEFAULT_MODEL = "v3.1-20260211";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const TASK_ID = /^[A-Za-z0-9_-]{4,200}$/;
-const ALLOWED_MODELS = new Set(["v3.1-20260211", "v3.0-20250812", "v2.5-20250123"]);
+const ALLOWED_MODELS = new Set(["v3.1-20260211", "v3.0-20250812"]);
 const ALLOWED_QUALITY = new Set(["standard", "detailed"]);
 const MAX_PROMPT_LENGTH = 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -59,7 +59,6 @@ function approximateFootprintRatio(spec) {
 export function buildTripoTextPrompt(rawBuildingSpec) {
   const { spec } = normalizeBuildingSpec(rawBuildingSpec);
   const architecture = spec.architecture ?? {};
-  const dimensions = spec.dimensions ?? {};
   const parts = [];
   const name = normalizeText(spec.name, 120);
   parts.push("Create one isolated exterior architectural 3D model of " + (name || "the described building") + ".");
@@ -127,6 +126,27 @@ async function readJsonResponse(response, label) {
     throw new Error(label + " failed: " + detail);
   }
   return payload.data;
+}
+
+function waitForPoll(intervalMs, signal) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (timer) clearTimeout(timer);
+      cleanup();
+      reject(signal?.reason ?? new Error("Tripo generation was aborted."));
+    };
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, intervalMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 async function readLimitedBody(response, maxBytes) {
@@ -260,6 +280,15 @@ export async function runTripoTextGeneration(options = {}) {
   const buildingId = safeId(options.buildingId ?? spec.id, "buildingId");
   const jobId = safeId(options.jobId, "jobId");
   if (spec.id !== buildingId) throw new TypeError("BuildingSpec id must equal buildingId.");
+  if (typeof options.workspaceRoot !== "string" || !options.workspaceRoot.trim()) {
+    throw new TypeError("workspaceRoot must be a non-empty path.");
+  }
+  const client = createTripoV3Client({
+    apiKey: options.apiKey ?? process.env.TRIPO_API_KEY,
+    fetchImpl: options.fetchImpl ?? fetch,
+    model: options.model ?? TRIPO_V3_DEFAULT_MODEL,
+  });
+  const prompt = buildTripoTextPrompt(options.buildingSpec);
   const pollIntervalMs = options.pollIntervalMs ?? 5000;
   const maxPollAttempts = options.maxPollAttempts ?? 120;
   if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 0 || pollIntervalMs > 60000) {
@@ -282,12 +311,6 @@ export async function runTripoTextGeneration(options = {}) {
   const realJobDir = await realpath(jobDir);
   if (!isInside(jobsRoot, realJobDir)) throw new TypeError("Tripo job directory resolves outside the building job root.");
 
-  const prompt = buildTripoTextPrompt(options.buildingSpec);
-  const client = createTripoV3Client({
-    apiKey: options.apiKey ?? process.env.TRIPO_API_KEY,
-    fetchImpl: options.fetchImpl ?? fetch,
-    model: options.model ?? TRIPO_V3_DEFAULT_MODEL,
-  });
   const reportPath = path.join(realJobDir, "report.json");
   const report = {
     schemaVersion: "1.0.0",
@@ -338,17 +361,7 @@ export async function runTripoTextGeneration(options = {}) {
         throw new Error("Tripo task ended with status " + task.status + (reason ? ": " + reason : "") + ".");
       }
       if (attempt + 1 < maxPollAttempts && pollIntervalMs > 0) {
-        await new Promise((resolve, reject) => {
-          const timer = setTimeout(resolve, pollIntervalMs);
-          if (options.signal) {
-            const abort = () => {
-              clearTimeout(timer);
-              reject(options.signal.reason ?? new Error("Tripo generation was aborted."));
-            };
-            if (options.signal.aborted) abort();
-            else options.signal.addEventListener("abort", abort, { once: true });
-          }
-        });
+        await waitForPoll(pollIntervalMs, options.signal);
       }
     }
     if (task?.status !== "success") {
