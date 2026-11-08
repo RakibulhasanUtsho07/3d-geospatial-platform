@@ -59,7 +59,7 @@
     "test:model-review-summary": "node --test tests/model-review-summary.test.mjs",
     "reconstruct:building-media": "node scripts/reconstruct-building-from-media.mjs",
     "test:single-image-3d": "node --test tests/single-image-3d-worker.test.mjs",
-    "test:tripo-v3-text-generation": "node --test tests/tripo-v3-text-generation.test.mjs",
+    "test:tripo-v3-text-generation": "node --test tests/tripo-v3-text-generation.test.mjs tests/tripo-v3-image-generation.test.mjs",
     "test:video-frame-operation-scopes": "node --test tests/video-frame-extractor-operation-scopes.test.mjs",
     "generate:building-from-image": "node scripts/generate-building-from-image.mjs",
     "generate:building-from-brief": "node scripts/generate-building-from-brief.mjs",
@@ -297,7 +297,8 @@
     "test:trust-registry-governance-provider-process-report": "node --test tests/trust-registry-governance-provider-process-report.test.mjs",
     "test:trust-registry-governance-provider-anchor-witness": "node --test tests/trust-registry-governance-provider-anchor-witness.test.mjs",
     "create:trust-registry-governance-provider-anchor-challenge": "node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs",
-    "verify:trust-registry-governance-provider-anchor-witness": "node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs"
+    "verify:trust-registry-governance-provider-anchor-witness": "node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs",
+    "test:tripo-v3-image-generation": "node --test tests/tripo-v3-image-generation.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
