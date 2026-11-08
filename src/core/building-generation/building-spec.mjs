@@ -3,7 +3,7 @@ import { SOURCE_OPERATION_SCOPES as SOURCE_OPERATION_SCOPE_LIST } from "./source
 const SOURCE_KINDS = new Set(["text", "image", "video", "video-frame", "floor-plan", "cad", "bim", "survey", "map", "other"]);
 const SOURCE_OPERATION_SCOPES = new Set(SOURCE_OPERATION_SCOPE_LIST);
 const CONFIDENCE = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown"]);
-const ROOFS = new Set(["flat", "terrace", "pitched"]);
+const ROOFS = new Set(["flat", "terrace", "pitched", "gable", "hip"]);
 const EARTH_RADIUS_M = 6378137;
 
 function obj(value, label) {
@@ -123,6 +123,12 @@ export function normalizeBuildingSpec(raw) {
   const a = input.architecture === undefined ? {} : obj(input.architecture, "architecture");
   const roofType = (a.roofType || "flat").toLowerCase();
   if (!ROOFS.has(roofType)) throw new TypeError("unsupported roofType");
+  const roofRiseM = a.roofRiseM === undefined || a.roofRiseM === null
+    ? null
+    : num(a.roofRiseM, "architecture.roofRiseM", 0.25, 10);
+  if (roofRiseM !== null && !["pitched", "gable", "hip"].includes(roofType)) {
+    throw new TypeError("architecture.roofRiseM is only valid for pitched, gable or hip roofs");
+  }
   const frontFacadeEdgeIndex = a.frontFacadeEdgeIndex === undefined
     ? undefined
     : num(a.frontFacadeEdgeIndex, "frontFacadeEdgeIndex", 0, ring.length - 1);
@@ -159,6 +165,7 @@ export function normalizeBuildingSpec(raw) {
   const architecture = {
     style: a.style === undefined ? "dhaka-residential-modern" : str(a.style, "style", 80),
     roofType,
+    roofRiseM,
     ...(frontFacadeEdgeIndex === undefined ? {} : { frontFacadeEdgeIndex }),
     frontFacingAzimuthDegrees,
     wallColor: hex(a.wallColor, "#D8D2C8", "wallColor"),
