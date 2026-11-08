@@ -356,6 +356,28 @@ function facadeSample(edge,frame,alongM,y) {
  };
 }
 
+
+test("binds the exact procedural structural-opening manifest into GLB extras and the QA report",()=>{
+ const result=generateProceduralGlb(fixture);
+ const model=parseGlb(result.glb);
+ const embedded=model.extras.building.structuralOpenings;
+ const manifest=result.report.structuralOpeningManifest;
+ assert.ok(embedded,"the exact GLB must carry its structural opening manifest");
+ assert.ok(manifest,"the QA report must expose the same structural opening manifest");
+ assert.deepEqual(embedded,manifest);
+ assert.deepEqual(embedded.openings,result.report.structuralOpenings);
+ assert.deepEqual(result.report.architecturePlacement.structuralOpeningManifest,embedded);
+ assert.equal(embedded.schemaVersion,"1.0.0");
+ assert.equal(embedded.engine,"procedural-glb-v1");
+ assert.equal(embedded.method,"perimeter-wall-shell-through-apertures");
+ assert.equal(embedded.openingCount,embedded.openings.length);
+ assert.ok(embedded.openingCount>0);
+ assert.equal(embedded.reviewRequired,true);
+ assert.ok(embedded.openings.every(opening=>opening.reviewRequired===true));
+ assert.ok(embedded.limitations.length>=2);
+ assert.equal(result.report.reviewRequired,true);
+});
+
 test("generates configurable arched window and door apertures with matching inserts",()=>{
  for(const reverseWinding of [false,true]){
   const spec=facadeTestSpec({
