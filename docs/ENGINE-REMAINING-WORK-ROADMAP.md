@@ -854,3 +854,13 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - **Validation status:** implementation is committed on the candidate branch. Pull-request exact-head Full CI and production renderer/viewport checks must complete successfully before merge; do not treat the older PR #350 run as validation of this port.
 - **Acceptance boundary:** opening positions/dimensions are still procedural estimates with `reviewRequired=true`. No source-image inference, survey accuracy, human visual approval or publication eligibility is created by adding shape controls.
 
+## 2026-11-08 — Facade profile helper QA and renderer trigger candidate
+
+- **Base Main:** `d9d530dace5c3a6fc3f8dfe127c169939a288aac` (PR #411 squash merge).
+- **Candidate branch:** `feat/facade-profile-helper-unit-tests-20261108`.
+- **Gap found in PR #350 audit:** Main's new `facade-wall-openings.mjs` helper was integration-tested through generated GLBs, but the reusable profile/contour extrusion API had no focused unit suite. The renderer smoke workflow also did not watch the helper's own path, so a helper-only edit would skip the Blender renderer smoke.
+- **Compatible QA port:** adds `tests/facade-wall-openings.test.mjs` for rectangular/arched profile invariants, invalid inputs, extrusion front/back/reveal faces, frame-hole area preservation and hole containment/overlap rejection. The `test:building-generation` command includes this suite.
+- **Workflow coverage:** adds the helper source and its unit-test file to both generic renderer smoke `push.paths` and `pull_request.paths`.
+- **What is intentionally not ported:** PR #350's `createWallPanelTopology` and `addWallPanelWithOpenings` API is a second wall-shell generator. Main already owns structural through-wall cuts in its per-edge/per-storey generator; keeping one owner avoids conflicting triangulation paths. New tests target only the helper APIs that Main actually uses.
+- **Validation:** exact-head Full CI and Blender renderer smoke must pass before merge. No real-building accuracy, survey or publication gate is changed.
+
