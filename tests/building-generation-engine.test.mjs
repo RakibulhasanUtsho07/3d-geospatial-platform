@@ -132,6 +132,31 @@ test("publishes the same facade selectors and mutual-exclusion rule in the JSON 
  assert.equal(architecture.additionalProperties,false);
 });
 
+test("publishes configurable arched door and window profiles in the BuildingSpec schema",()=>{
+ const architecture=buildingSpecSchema.properties.architecture.properties;
+ assert.deepEqual(architecture.doorShape,{enum:["rectangular","arched"]});
+ assert.deepEqual(architecture.windows.properties.shape,{enum:["rectangular","arched"]});
+});
+
+test("normalizes rectangular defaults and validates configurable arched facade profiles",()=>{
+ const defaults=normalizeBuildingSpec(facadeTestSpec()).spec.architecture;
+ assert.equal(defaults.windows.shape,"rectangular");
+ assert.equal(defaults.doorShape,"rectangular");
+
+ const arched=normalizeBuildingSpec(facadeTestSpec({
+  architecture:{windows:{shape:"arched"},doorShape:"arched"}
+ })).spec.architecture;
+ assert.equal(arched.windows.shape,"arched");
+ assert.equal(arched.doorShape,"arched");
+
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({
+  architecture:{windows:{shape:"circular"}}
+ })),/windows.shape/);
+ assert.throws(()=>normalizeBuildingSpec(facadeTestSpec({
+  architecture:{doorShape:"pointed"}
+ })),/doorShape/);
+});
+
 test("normalizes explicit front facade edge and compass bearing as mutually exclusive selectors",()=>{
  const explicit=normalizeBuildingSpec(facadeTestSpec({architecture:{frontFacadeEdgeIndex:1}}));
  assert.equal(explicit.spec.architecture.frontFacadeEdgeIndex,1);
@@ -330,6 +355,67 @@ function facadeSample(edge,frame,alongM,y) {
   z:edge.z+frame.tangent.z*alongM
  };
 }
+
+test("generates configurable arched window and door apertures with matching inserts",()=>{
+ for(const reverseWinding of [false,true]){
+  const spec=facadeTestSpec({
+   reverseWinding,
+   architecture:{windows:{shape:"arched"},doorShape:"arched"}
+  });
+  const result=generateProceduralGlb(spec);
+  const openings=result.report.structuralOpenings;
+  const archWindows=openings.filter(item=>item.kind==="window");
+  const archDoor=openings.find(item=>item.kind==="door");
+  assert.ok(archWindows.length>0);
+  assert.ok(archWindows.every(item=>item.shape==="arched"&&item.archRadiusM>0));
+  assert.ok(archDoor);
+  assert.equal(archDoor.shape,"arched");
+  assert.ok(archDoor.archRadiusM>0);
+
+  const normalized=normalizeBuildingSpec(spec);
+  const points=normalized.derived.localFootprint;
+  const frames=facadeFramesFor(spec);
+  const frontIndex=result.report.facadeSelection.edgeIndex;
+  const frontEdge=points[frontIndex];
+  const frontFrame=frames[frontIndex];
+  const doorInside=facadeSample(
+   frontEdge,frontFrame,archDoor.centerAlongEdgeM,
+   archDoor.topM-Math.min(0.1,archDoor.archRadiusM*0.2)
+  );
+  const doorAbove=facadeSample(
+   frontEdge,frontFrame,archDoor.centerAlongEdgeM,archDoor.topM+0.08
+  );
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",doorInside),false,
+   "the configurable arched door must remove the wall up to its curved crown");
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",doorAbove),true,
+   "the wall above the configurable arched door must remain closed");
+
+  const archWindow=archWindows.find(item=>item.edgeIndex!==frontIndex);
+  assert.ok(archWindow,"an arched window must be generated on a non-front facade");
+  const windowEdge=points[archWindow.edgeIndex];
+  const windowFrame=frames[archWindow.edgeIndex];
+  const windowInside=facadeSample(
+   windowEdge,windowFrame,archWindow.centerAlongEdgeM,
+   archWindow.topM-Math.min(0.1,archWindow.archRadiusM*0.2)
+  );
+  const windowAbove=facadeSample(
+   windowEdge,windowFrame,archWindow.centerAlongEdgeM,archWindow.topM+0.08
+  );
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",windowInside),false,
+   "the configurable arched window must cut through the wall");
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",windowAbove),true,
+   "the wall above the configurable arched window must remain closed");
+
+  const qa=analyzeGlbQuality(result.glb);
+  assert.equal(qa.valid,true);
+  assert.equal(qa.counts.degenerateTriangleCount,0);
+  for(const mesh of qa.meshDetails){
+   assert.equal(mesh.topology.topologyAnalyzed,true);
+   assert.equal(mesh.topology.nonManifoldEdgeCount,0,
+    "arched facade inserts must preserve closed mesh topology");
+  }
+ }
+});
 
 test("generates true rectangular window and door wall openings for both footprint windings",()=>{
  for(const reverseWinding of [false,true]){
