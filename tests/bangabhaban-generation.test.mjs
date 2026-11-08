@@ -38,3 +38,27 @@ test("saved Bangabhaban candidate report cannot silently authorize map publicati
   assert.equal(report.building.footprint.geometryStatus, "estimated-rectangle-not-survey-traced");
   assert.match(report.model.sha256, /^[a-f0-9]{64}$/);
 });
+
+
+test("Bangabhaban selects its estimated south facade and centers the dome on the footprint bounds", () => {
+  const result = generateBuildingModel(spec);
+  assert.equal(result.normalizedSpec.architecture.frontFacingAzimuthDegrees, 180);
+  assert.equal(result.normalizedSpec.architecture.centralDome.anchor, "footprint-bounds-center");
+  assert.equal(result.report.facadeSelection.method, "azimuth-nearest-edge");
+  assert.equal(result.report.facadeSelection.edgeIndex, 0);
+  assert.equal(result.report.facadeSelection.requestedAzimuthDegrees, 180);
+  assert.equal(result.report.facadeSelection.actualAzimuthDegrees, 180);
+  assert.equal(result.report.facadeSelection.confidence, "estimated");
+  assert.equal(result.report.architecturePlacement.centralDome.anchor, "footprint-bounds-center");
+  assert.ok(Math.abs(result.report.architecturePlacement.centralDome.centerModelXZ.x) < 0.05);
+  assert.ok(Math.abs(result.report.architecturePlacement.centralDome.centerModelXZ.z) < 0.05);
+
+  const jsonLength = result.glb.readUInt32LE(12);
+  const gltf = JSON.parse(result.glb.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const glbFacade = gltf.extras.building.facadeOrientation;
+  assert.equal(glbFacade.coordinateFrame, "glTF-local:+X=east,+Y=up,+Z=north");
+  assert.equal(glbFacade.actualAzimuthDegrees, 180);
+  assert.equal(glbFacade.confidence, "estimated");
+  assert.equal(glbFacade.reviewRequired, true);
+  assert.equal(result.report.reviewRequired, true);
+});
