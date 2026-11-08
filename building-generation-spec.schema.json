@@ -258,7 +258,10 @@
           "additionalProperties": false
         },
         "roofRiseM": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0.25,
           "maximum": 10,
           "description": "Optional metric roof rise for pitched, gable or hip roofs. If omitted, the generator selects a bounded parametric rise."
