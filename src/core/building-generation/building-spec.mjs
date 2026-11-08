@@ -3,7 +3,7 @@ import { SOURCE_OPERATION_SCOPES as SOURCE_OPERATION_SCOPE_LIST } from "./source
 const SOURCE_KINDS = new Set(["text", "image", "video", "video-frame", "floor-plan", "cad", "bim", "survey", "map", "other"]);
 const SOURCE_OPERATION_SCOPES = new Set(SOURCE_OPERATION_SCOPE_LIST);
 const CONFIDENCE = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown"]);
-const ROOFS = new Set(["flat", "terrace", "pitched"]);
+const ROOFS = new Set(["flat", "terrace", "pitched", "gable", "hip"]);
 const EARTH_RADIUS_M = 6378137;
 
 function obj(value, label) {

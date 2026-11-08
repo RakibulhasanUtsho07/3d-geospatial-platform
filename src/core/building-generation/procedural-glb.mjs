@@ -65,6 +65,127 @@ function triangulate(points) {
   if(order.length===3) triangles.push(order.slice()); return triangles;
 }
 
+function rectangularRoofFrame(points) {
+  if (!Array.isArray(points) || points.length !== 4) return null;
+  const [p0, p1, p2, p3] = points;
+  const vector = (a, b) => ({ x: b.x - a.x, z: b.z - a.z });
+  const length = value => Math.hypot(value.x, value.z);
+  const dot = (a, b) => a.x * b.x + a.z * b.z;
+  const cross = (a, b) => a.x * b.z - a.z * b.x;
+  const edges = [vector(p0, p1), vector(p1, p2), vector(p2, p3), vector(p3, p0)];
+  const lengths = edges.map(length);
+  if (lengths.some(value => !Number.isFinite(value) || value < 0.5)) return null;
+  const approximatelyEqual = (a, b) => Math.abs(a - b) <= Math.max(0.03, Math.max(a, b) * 0.025);
+  if (!approximatelyEqual(lengths[0], lengths[2]) || !approximatelyEqual(lengths[1], lengths[3])) return null;
+  const cosine = Math.abs(dot(edges[0], edges[1]) / (lengths[0] * lengths[1]));
+  if (cosine > 0.025) return null;
+  if (dot(edges[0], edges[2]) / (lengths[0] * lengths[2]) > -0.98) return null;
+  if (dot(edges[1], edges[3]) / (lengths[1] * lengths[3]) > -0.98) return null;
+  const closureError = Math.hypot(p0.x + p2.x - p1.x - p3.x, p0.z + p2.z - p1.z - p3.z);
+  if (closureError > 0.04) return null;
+
+  const firstIsLong = lengths[0] >= lengths[1];
+  const longEdge = firstIsLong ? edges[0] : vector(p0, p3);
+  const shortEdge = firstIsLong ? vector(p0, p3) : edges[0];
+  const longLength = firstIsLong ? lengths[0] : lengths[1];
+  const shortLength = firstIsLong ? lengths[1] : lengths[0];
+  return {
+    origin: { x: p0.x, z: p0.z },
+    longAxis: { x: longEdge.x / longLength, z: longEdge.z / longLength },
+    shortAxis: { x: shortEdge.x / shortLength, z: shortEdge.z / shortLength },
+    longLength,
+    shortLength,
+    widthM: longLength,
+    depthM: shortLength,
+  };
+}
+
+function addPitchedRoof(geo, frame, roofType, eaveY, ridgeY) {
+  const { origin, longAxis, shortAxis, longLength, shortLength } = frame;
+  const halfWidth = shortLength / 2;
+  const rise = ridgeY - eaveY;
+  const point = (along, across, y) => [
+    origin.x + longAxis.x * along + shortAxis.x * across,
+    y,
+    origin.z + longAxis.z * along + shortAxis.z * across,
+  ];
+  const lowSideNormal = [-shortAxis.x * rise, halfWidth, -shortAxis.z * rise];
+  const highSideNormal = [shortAxis.x * rise, halfWidth, shortAxis.z * rise];
+
+  if (roofType === "gable") {
+    geo.quad("roof",
+      point(0, 0, eaveY), point(longLength, 0, eaveY),
+      point(longLength, halfWidth, ridgeY), point(0, halfWidth, ridgeY),
+      lowSideNormal);
+    geo.quad("roof",
+      point(longLength, shortLength, eaveY), point(0, shortLength, eaveY),
+      point(0, halfWidth, ridgeY), point(longLength, halfWidth, ridgeY),
+      highSideNormal);
+    geo.triangle("wall",
+      point(0, 0, eaveY), point(0, shortLength, eaveY), point(0, halfWidth, ridgeY),
+      [-longAxis.x, 0, -longAxis.z]);
+    geo.triangle("wall",
+      point(longLength, shortLength, eaveY), point(longLength, 0, eaveY), point(longLength, halfWidth, ridgeY),
+      [longAxis.x, 0, longAxis.z]);
+    return;
+  }
+
+  const ridgeStart = Math.max(0, (longLength - shortLength) / 2);
+  const ridgeEnd = longLength - ridgeStart;
+  if (ridgeEnd - ridgeStart > 0.05) {
+    geo.quad("roof",
+      point(0, 0, eaveY), point(longLength, 0, eaveY),
+      point(ridgeEnd, halfWidth, ridgeY), point(ridgeStart, halfWidth, ridgeY),
+      lowSideNormal);
+    geo.quad("roof",
+      point(longLength, shortLength, eaveY), point(0, shortLength, eaveY),
+      point(ridgeStart, halfWidth, ridgeY), point(ridgeEnd, halfWidth, ridgeY),
+      highSideNormal);
+    geo.triangle("roof",
+      point(0, shortLength, eaveY), point(0, 0, eaveY), point(ridgeStart, halfWidth, ridgeY),
+      [-longAxis.x * rise, halfWidth, -longAxis.z * rise]);
+    geo.triangle("roof",
+      point(longLength, 0, eaveY), point(longLength, shortLength, eaveY), point(ridgeEnd, halfWidth, ridgeY),
+      [longAxis.x * rise, halfWidth, longAxis.z * rise]);
+  } else {
+    const apex = point(longLength / 2, halfWidth, ridgeY);
+    geo.triangle("roof", point(0, 0, eaveY), point(longLength, 0, eaveY), apex, lowSideNormal);
+    geo.triangle("roof", point(longLength, 0, eaveY), point(longLength, shortLength, eaveY), apex, [longAxis.x * rise, halfWidth, longAxis.z * rise]);
+    geo.triangle("roof", point(longLength, shortLength, eaveY), point(0, shortLength, eaveY), apex, highSideNormal);
+    geo.triangle("roof", point(0, shortLength, eaveY), point(0, 0, eaveY), apex, [-longAxis.x * rise, halfWidth, -longAxis.z * rise]);
+  }
+}
+
+function resolveRoofGeometry(roofType, points, heightM, parapetHeightM, warnings) {
+  const requestedType = roofType;
+  let generatedType = roofType === "pitched" ? "gable" : roofType;
+  let frame = null;
+  if (generatedType === "gable" || generatedType === "hip") {
+    frame = rectangularRoofFrame(points);
+    if (!frame) {
+      warnings.push("Gable/hip roofs require a measured rectangular footprint; a flat roof cap was generated instead.");
+      generatedType = "flat";
+    }
+    if (requestedType === "pitched") {
+      warnings.push("The generic pitched roof option uses a gable ridge; select gable or hip to specify the roof form.");
+    }
+  }
+  const eaveHeightM = heightM + parapetHeightM;
+  const ridgeRiseM = generatedType === "gable" || generatedType === "hip"
+    ? Math.min(2.5, Math.max(0.5, heightM * 0.15))
+    : 0;
+  return {
+    requestedType,
+    generatedType,
+    frame,
+    eaveHeightM,
+    ridgeRiseM,
+    peakHeightM: eaveHeightM + ridgeRiseM,
+    rectangularFootprint: frame !== null,
+    reviewRequired: generatedType === "gable" || generatedType === "hip",
+  };
+}
+
 function openingTopAt(opening, alongM) {
   if (opening.shape !== "arched") return opening.topM;
   const dx = alongM - opening.centerAlongEdgeM;
@@ -218,7 +339,7 @@ function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings
   }
 }
 
-function encodeGlb(spec, geo, facadeOrientation) {
+function encodeGlb(spec, geo, facadeOrientation, roofGeometry) {
   const active=MATERIALS.filter(name=>geo.groups.get(name).indices.length), indexOf=new Map(active.map((name,i)=>[name,i]));
   const materials=active.map(name=>({name:name==="wall"?"Facade":name[0].toUpperCase()+name.slice(1),pbrMetallicRoughness:{baseColorFactor:rgba(({wall:spec.architecture.wallColor,roof:spec.architecture.roofColor,glass:spec.architecture.glassColor,frame:spec.architecture.frameColor,concrete:spec.architecture.concreteColor,door:spec.architecture.doorColor,metal:"#4B5563"})[name]),metallicFactor:name==="metal"?0.65:0,roughnessFactor:name==="glass"?0.24:0.78}}));
   const bins=[], views=[], accessors=[], meshes=[], nodes=[]; let offset=0;
@@ -234,7 +355,7 @@ function encodeGlb(spec, geo, facadeOrientation) {
     const pa=accessor(pi,5126,g.positions.length/3,"VEC3",{min,max}),na=accessor(ni,5126,g.normals.length/3,"VEC3"),ia=accessor(ii,small?5123:5125,ivals.length,"SCALAR",{min:[lo],max:[hi]});
     meshes.push({name:spec.id+"-"+name,primitives:[{attributes:{POSITION:pa,NORMAL:na},indices:ia,material:indexOf.get(name),mode:4}]});nodes.push({name:spec.name+" - "+name,mesh:meshes.length-1});
   }
-  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,facadeOrientation}}};
+  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,generatedRoofType:roofGeometry.generatedType,roofPeakHeightM:Number(roofGeometry.peakHeightM.toFixed(3)),facadeOrientation}}};
   const jb=Buffer.from(JSON.stringify(gltf)), jp=(4-jb.length%4)%4, bp=(4-binary.length%4)%4;
   const json=Buffer.concat([jb,Buffer.alloc(jp,0x20)]), bin=bp?Buffer.concat([binary,Buffer.alloc(bp)]):binary, total=12+8+json.length+8+bin.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
@@ -244,7 +365,6 @@ function encodeGlb(spec, geo, facadeOrientation) {
 }
 export function generateProceduralGlb(rawSpec) {
   const {spec,derived}=normalizeBuildingSpec(rawSpec), warnings=[];
-  if(spec.architecture.roofType==="pitched")warnings.push("Pitched roofs are not implemented; a flat roof cap is emitted.");
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
@@ -491,7 +611,12 @@ export function generateProceduralGlb(rawSpec) {
       for(let r=0;r<=4;r++){const offset=-bw/2+bw*r/4,px=rx+Math.cos(e.yaw)*offset,pz=rz-Math.sin(e.yaw)*offset;geo.box("metal",px,y+0.28,pz,0.035,0.48,0.04);}
     }
   }
-  for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
+  const roofGeometry=resolveRoofGeometry(spec.architecture.roofType,points,height,spec.dimensions.parapetHeightM,warnings);
+  if(roofGeometry.generatedType==="gable"||roofGeometry.generatedType==="hip"){
+    addPitchedRoof(geo,roofGeometry.frame,roofGeometry.generatedType,roofGeometry.eaveHeightM,roofGeometry.peakHeightM);
+  }else{
+    for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
+  }
   if(spec.dimensions.parapetHeightM>0)for(const e of edges){geo.box("concrete",(e.p.x+e.n.x)/2-e.out.x*wt/2,height+spec.dimensions.parapetHeightM/2,(e.p.z+e.n.z)/2-e.out.z*wt/2,e.len+wt*0.3,spec.dimensions.parapetHeightM,wt,e.yaw);}
   if(spec.architecture.roofType==="terrace"){const b=spec.footprint.bounds,w=b.maxX-b.minX,d=b.maxZ-b.minZ;if(w>2.5&&d>2.5)geo.box("concrete",(b.minX+b.maxX)/2,height+0.025,(b.minZ+b.maxZ)/2,Math.min(w*0.55,4.2),0.05,Math.min(d*0.35,2.8));}
 
@@ -598,7 +723,7 @@ export function generateProceduralGlb(rawSpec) {
     source:selectedFacade.source,
     reviewRequired:frontAxisNeedsReview||selectedFacade.reviewRequired
   };
-  const glb=encodeGlb(spec,geo,facadeOrientation);
+  const glb=encodeGlb(spec,geo,facadeOrientation,roofGeometry);
   const structuralOpeningRecords=structuralOpenings.map(opening=>({
     edgeIndex:opening.edgeIndex,floorIndex:opening.floorIndex,kind:opening.kind,shape:opening.shape,
     centerAlongEdgeM:Number(opening.centerAlongEdgeM.toFixed(3)),widthM:Number(opening.widthM.toFixed(3)),
@@ -608,8 +733,9 @@ export function generateProceduralGlb(rawSpec) {
   }));
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
-    output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
+    output:{format:"glb",bytes:glb.byteLength,heightM:Number(roofGeometry.peakHeightM.toFixed(2))},
     geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
+    roof:{requestedType:roofGeometry.requestedType,generatedType:roofGeometry.generatedType,eaveHeightM:Number(roofGeometry.eaveHeightM.toFixed(3)),ridgeRiseM:Number(roofGeometry.ridgeRiseM.toFixed(3)),peakHeightM:Number(roofGeometry.peakHeightM.toFixed(3)),rectangularFootprint:roofGeometry.rectangularFootprint,reviewRequired:roofGeometry.reviewRequired},
     facadeOrientation,
     structuralOpenings:structuralOpeningRecords,
     facadeSelection:{
@@ -643,7 +769,8 @@ export function generateProceduralGlb(rawSpec) {
       frontAxisNeedsReview||
       selectedFacade.reviewRequired||
       structuralOpeningRecords.some(opening=>opening.reviewRequired)||
-      (domePlacement?.reviewRequired===true),
+      (domePlacement?.reviewRequired===true)||
+       roofGeometry.reviewRequired,
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
