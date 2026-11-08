@@ -193,90 +193,6 @@ export function createFacadeOpeningProfile({
   return orientRing(profile, true);
 }
 
-function validateProfilesInsidePanel(lengthM, heightM, profiles) {
-  for (let index = 0; index < profiles.length; index++) {
-    const profile = profiles[index];
-    for (const point of profile.points) {
-      if (point.u <= EPSILON || point.u >= lengthM - EPSILON ||
-          point.y <= -EPSILON || point.y >= heightM + EPSILON) {
-        throw new RangeError("opening " + profile.id + " must be fully inside its wall panel");
-      }
-    }
-    for (let other = 0; other < index; other++) {
-      if (ringsIntersect(profile.points, profiles[other].points)) {
-        throw new RangeError("wall openings must not overlap: " + profiles[other].id + " and " + profile.id);
-      }
-    }
-  }
-}
-
-export function createWallPanelTopology({ lengthM, heightM, openings = [] }) {
-  finite(lengthM, "wall.lengthM");
-  finite(heightM, "wall.heightM");
-  if (lengthM <= 0 || heightM <= 0) throw new RangeError("wall dimensions must be positive");
-  if (!Array.isArray(openings)) throw new TypeError("wall.openings must be an array");
-  if (openings.length > 128) throw new RangeError("a wall panel may contain at most 128 openings");
-
-  const outer = orientRing([
-    { u: 0, y: 0 },
-    { u: lengthM, y: 0 },
-    { u: lengthM, y: heightM },
-    { u: 0, y: heightM },
-  ], true);
-  const seenIds = new Set();
-  const records = openings.map((opening, index) => {
-    if (!opening || typeof opening !== "object" || Array.isArray(opening)) {
-      throw new TypeError("wall.openings[" + index + "] must be an object");
-    }
-    const id = typeof opening.id === "string" && opening.id.trim()
-      ? opening.id.trim()
-      : "opening-" + (index + 1);
-    if (seenIds.has(id)) throw new TypeError("duplicate wall opening id: " + id);
-    seenIds.add(id);
-    if (opening.kind !== "window" && opening.kind !== "door") {
-      throw new TypeError("wall opening kind must be window or door");
-    }
-    const points = createFacadeOpeningProfile(opening);
-    const profileAreaM2 = Math.abs(signedArea(points));
-    return {
-      id,
-      kind: opening.kind,
-      shape: opening.shape ?? "rectangular",
-      centerU: opening.centerU,
-      bottomM: opening.bottomM,
-      widthM: opening.widthM,
-      heightM: opening.heightM,
-      profileAreaM2,
-      points: orientRing(points, false),
-    };
-  });
-
-  validateProfilesInsidePanel(lengthM, heightM, records);
-  const contours = [outer, ...records.map((record) => record.points)];
-  const tessellation = tessellateContours(contours);
-  const expectedAreaM2 = lengthM * heightM -
-    records.reduce((sum, record) => sum + record.profileAreaM2, 0);
-  if (Math.abs(tessellation.faceAreaM2 - expectedAreaM2) > Math.max(1e-5, lengthM * heightM * 1e-7)) {
-    throw new Error("wall opening tessellation area does not match its declared profiles");
-  }
-  return {
-    schemaVersion: "1.0.0",
-    engine: "facade-wall-openings-v1",
-    method: "scanline-triangulated-through-wall",
-    lengthM,
-    heightM,
-    wallFaceAreaM2: Number(tessellation.faceAreaM2.toFixed(6)),
-    expectedWallFaceAreaM2: Number(expectedAreaM2.toFixed(6)),
-    frontQuads: tessellation.frontQuads,
-    boundaryEdges: tessellation.boundaryEdges,
-    openings: records.map(({ points, profileAreaM2, ...record }) => ({
-      ...record,
-      profileAreaM2: Number(profileAreaM2.toFixed(6)),
-    })),
-    contours,
-  };
-}
-
 function mapWallPoint(edge, baseY, point, depth) {
   return [
     edge.p.x + edge.tangent.x * point.u + edge.out.x * depth,
@@ -320,40 +236,6 @@ function addExtrudedContours(geo, { edge, baseY, contours, frontDepth, depthM, m
     geo.quad(material, frontA, frontB, backB, backA, boundaryNormal(edge, boundary.a, boundary.b));
   }
   return { faceAreaM2: topology.faceAreaM2, boundaryEdgeCount: topology.boundaryEdges.length };
-}
-
-export function addWallPanelWithOpenings(geo, {
-  edge,
-  baseY,
-  heightM,
-  wallThicknessM,
-  openings = [],
-}) {
-  finite(wallThicknessM, "wallThicknessM");
-  if (wallThicknessM <= 0) throw new RangeError("wallThicknessM must be positive");
-  const topology = createWallPanelTopology({
-    lengthM: edge.len,
-    heightM,
-    openings,
-  });
-  for (const quad of topology.frontQuads) {
-    const front = quad.map((point) => mapWallPoint(edge, baseY, point, 0));
-    const back = quad.map((point) => mapWallPoint(edge, baseY, point, -wallThicknessM));
-    geo.quad("wall", ...front, [edge.out.x, 0, edge.out.z]);
-    geo.quad("wall", ...back, [-edge.out.x, 0, -edge.out.z]);
-  }
-  for (const boundary of topology.boundaryEdges) {
-    const frontA = mapWallPoint(edge, baseY, boundary.a, 0);
-    const frontB = mapWallPoint(edge, baseY, boundary.b, 0);
-    const backB = mapWallPoint(edge, baseY, boundary.b, -wallThicknessM);
-    const backA = mapWallPoint(edge, baseY, boundary.a, -wallThicknessM);
-    geo.quad("wall", frontA, frontB, backB, backA, boundaryNormal(edge, boundary.a, boundary.b));
-  }
-  return {
-    wallFaceAreaM2: topology.wallFaceAreaM2,
-    openings: topology.openings,
-    method: topology.method,
-  };
 }
 
 export function addExtrudedFacadeProfile(geo, {
