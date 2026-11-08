@@ -27,7 +27,7 @@ colmap mesh_texturer --help
 If COLMAP is not on PATH, set BUILDING_ENGINE_COLMAP_PATH to the exact executable path. From the repository root, set the same persistent private workspace used by the Next.js API:
 
 ~~~powershell
-$env:BUILDING_ENGINE_WORKSPACE = "D:\\BuildingEngineWorkspace"
+$env:BUILDING_ENGINE_WORKSPACE = "D:\BuildingEngineWorkspace"
 $env:BUILDING_ENGINE_COLMAP_PATH = "<absolute-path-to-colmap-executable>"
 node scripts/run-generation-worker.mjs --help
 ~~~
@@ -69,7 +69,7 @@ Example PowerShell submission (run from a trusted local operator shell; never pa
 
 ~~~powershell
 $headers = @{ Authorization = "Bearer $env:GENERATION_API_TOKEN" }
-$body = Get-Content -Raw ".\\photogrammetry-job.json"
+$body = Get-Content -Raw ".\photogrammetry-job.json"
 Invoke-RestMethod -Method Post -Uri "http://localhost:3000/api/building-generation/jobs" -Headers $headers -ContentType "application/json" -Body $body
 ~~~
 
@@ -80,7 +80,7 @@ The API and worker must use the same persistent workspace. Queue authentication 
 In a second trusted shell on the worker host:
 
 ~~~powershell
-$env:BUILDING_ENGINE_WORKSPACE = "D:\\BuildingEngineWorkspace"
+$env:BUILDING_ENGINE_WORKSPACE = "D:\BuildingEngineWorkspace"
 $env:BUILDING_ENGINE_COLMAP_PATH = "<absolute-path-to-colmap-executable>"
 node scripts/run-generation-worker.mjs --once
 ~~~
