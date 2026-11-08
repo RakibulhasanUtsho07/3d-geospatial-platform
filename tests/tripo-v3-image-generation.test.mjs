@@ -178,6 +178,7 @@ test("runs labelled front/side multiview generation only when every selected sou
     sources,
     viewSourceIds: ["front-photo", "left-photo"],
     viewLabels: { front: "front-photo", left: "left-photo" },
+    confirmSameBuilding: true,
     confirmRights: true,
     confirmExternalProviderProcessing: true,
     allowPaidProviderGeneration: true,
@@ -189,6 +190,7 @@ test("runs labelled front/side multiview generation only when every selected sou
   const workerReport = result.report.modelReport;
   assert.equal(result.report.mode, "tripo-image-ai");
   assert.equal(workerReport.generationStage, "multiview-to-model");
+  assert.equal(workerReport.sameBuildingConfirmed, true);
   assert.deepEqual(workerReport.sources.map(source => source.view), ["front", "left"]);
   assert.equal(workerReport.sources.length, 2);
   assert.equal(workerReport.output.sha256.length, 64);
@@ -216,6 +218,30 @@ test("rejects missing paid-provider consent before creating workspace artefacts 
       fetchImpl: mock.fetchImpl,
     }),
     /allowPaidProviderGeneration=true/,
+  );
+  assert.equal(mock.calls.length, 0);
+});
+
+test("requires explicit same-building confirmation before a paid multiview job", async t => {
+  const root = await workspace(t);
+  const mock = createFetchMock("multiview-to-model");
+  const sources = await createSourceInputs(root, ["front-photo", "left-photo"]);
+  await assert.rejects(
+    runMediaToModelWorkflow({
+      workspaceRoot: root,
+      buildingSpec: fixture,
+      jobId: "tripo-same-building-unconfirmed",
+      strategy: "tripo-image",
+      sources,
+      viewSourceIds: ["front-photo", "left-photo"],
+      viewLabels: { front: "front-photo", left: "left-photo" },
+      confirmRights: true,
+      confirmExternalProviderProcessing: true,
+      allowPaidProviderGeneration: true,
+      apiKey: "test-api-key",
+      fetchImpl: mock.fetchImpl,
+    }),
+    /confirmSameBuilding=true/,
   );
   assert.equal(mock.calls.length, 0);
 });
