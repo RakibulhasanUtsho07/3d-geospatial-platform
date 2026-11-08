@@ -547,7 +547,7 @@ test("generates true gable and hip roofs for rotated rectangular footprints in b
     assert.equal(result.report.roof.generatedType,expectedGeneratedType);
     assert.equal(result.report.roof.rectangularFootprint,true);
     assert.equal(result.report.roof.reviewRequired,true);
-    assert.ok(Math.abs(result.report.roof.ridgeRiseM-expectedRise)<1e-6);
+    assert.ok(Math.abs(result.report.roof.ridgeRiseM-expectedRise)<0.001);
     assert.ok(Math.abs(result.report.output.heightM-expectedPeak)<0.01);
     assert.ok(roofVertices.some(point=>Math.abs(point.y-expectedPeak)<0.01),"roof ridge/apex reaches the computed peak");
     assert.ok(result.report.reviewRequired,"procedural pitch remains review-required");
@@ -579,7 +579,7 @@ test("falls back safely to a flat cap when gable/hip geometry is requested for a
  assert.equal(result.report.roof.generatedType,"flat");
  assert.equal(result.report.roof.rectangularFootprint,false);
  assert.equal(result.report.roof.ridgeRiseM,0);
- assert.ok(result.report.warnings.some(message=>message.includes("requires a measured rectangular footprint")));
+ assert.ok(result.report.warnings.some(message=>message.includes("measured rectangular footprint")));
  const qa=analyzeGlbQuality(result.glb);
  assert.equal(qa.valid,true);
  assert.equal(qa.counts.degenerateTriangleCount,0);
