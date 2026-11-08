@@ -1,5 +1,6 @@
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { createFacadeFrame, offsetFacadePoint, selectFrontFacadeEdge, surfaceInsertCenterOffset } from "./facade-placement.mjs";
+import { addExtrudedFacadeProfile, createFacadeOpeningProfile } from "./facade-wall-openings.mjs";
 const MATERIALS = ["wall", "roof", "glass", "frame", "concrete", "door", "metal"];
 function rgba(hex) { const s = hex.slice(1); return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) / 255).concat(1); }
 function normal(a, b, c) {
@@ -320,8 +321,9 @@ export function generateProceduralGlb(rawSpec) {
           const centerAlongEdgeM=e.len*t;
           const centerY=floorY+floorH*0.56;
           const opening={
-            kind:"window",shape:"rectangular",edgeIndex:ei,floorIndex:floor,
-            centerAlongEdgeM,widthM,bottomM:centerY-heightM/2,topM:centerY+heightM/2
+            kind:"window",shape:windowSpec.shape,edgeIndex:ei,floorIndex:floor,
+            centerAlongEdgeM,widthM,bottomM:centerY-heightM/2,topM:centerY+heightM/2,
+            ...(windowSpec.shape==="arched"?{archRadiusM:Math.min(widthM/2,heightM*0.55)}:{})
           };
           openings.push(opening);
           structuralOpenings.push(opening);
@@ -330,15 +332,42 @@ export function generateProceduralGlb(rawSpec) {
           // wall volume behind the pane and frame.
           const edgePoint={x:e.p.x+(e.n.x-e.p.x)*t,z:e.p.z+(e.n.z-e.p.z)*t};
           const paneDepth=0.055,frameDepth=0.075,faceClearanceM=0.002,f=0.055;
-          const panePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(paneDepth,faceClearanceM));
-          const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-          const leftJamb=offsetFacadePoint(edgePoint,e,-widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-          const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-          geo.box("glass",panePoint.x,centerY,panePoint.z,widthM,heightM,paneDepth,e.yaw);
-          geo.box("frame",framePoint.x,centerY+heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
-          geo.box("frame",framePoint.x,centerY-heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
-          geo.box("frame",leftJamb.x,centerY,leftJamb.z,f,heightM,frameDepth,e.yaw);
-          geo.box("frame",rightJamb.x,centerY,rightJamb.z,f,heightM,frameDepth,e.yaw);
+          if(opening.shape==="arched"){
+            const localOpening={
+              centerU:centerAlongEdgeM,bottomM:opening.bottomM-floorY,widthM,
+              heightM:opening.topM-opening.bottomM,shape:"arched",archSegments:16
+            };
+            const paneProfile=createFacadeOpeningProfile(localOpening);
+            addExtrudedFacadeProfile(geo,{
+              edge:e,baseY:floorY,profile:paneProfile,
+              frontDepth:paneDepth+faceClearanceM,depthM:paneDepth,material:"glass"
+            });
+
+            const frameBottom=Math.max(0,localOpening.bottomM-0.05);
+            const frameWidth=widthM+f*2;
+            const frameHeight=Math.min(floorH-frameBottom-0.02,localOpening.heightM+0.10);
+            if(frameHeight>localOpening.heightM+0.01&&frameWidth>widthM){
+              const frameProfile=createFacadeOpeningProfile({
+                ...localOpening,bottomM:frameBottom,widthM:frameWidth,heightM:frameHeight
+              });
+              addExtrudedFacadeProfile(geo,{
+                edge:e,baseY:floorY,profile:frameProfile,holes:[paneProfile],
+                frontDepth:frameDepth+faceClearanceM,depthM:frameDepth,material:"frame"
+              });
+            }else{
+              warnings.push("An arched window frame could not maintain its required surround clearance; human review is required.");
+            }
+          }else{
+            const panePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(paneDepth,faceClearanceM));
+            const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+            const leftJamb=offsetFacadePoint(edgePoint,e,-widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+            const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+            geo.box("glass",panePoint.x,centerY,panePoint.z,widthM,heightM,paneDepth,e.yaw);
+            geo.box("frame",framePoint.x,centerY+heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
+            geo.box("frame",framePoint.x,centerY-heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
+            geo.box("frame",leftJamb.x,centerY,leftJamb.z,f,heightM,frameDepth,e.yaw);
+            geo.box("frame",rightJamb.x,centerY,rightJamb.z,f,heightM,frameDepth,e.yaw);
+          }
         }
       }
 
@@ -359,8 +388,9 @@ export function generateProceduralGlb(rawSpec) {
         const widthM=Math.min(1.05,e.len*0.25);
         const doorHeight=Math.min(2.16,floorH-0.05);
         const opening={
-          kind:"door",shape:"rectangular",edgeIndex:ei,floorIndex:floor,
-          centerAlongEdgeM:e.len/2,widthM,bottomM:floorY,topM:floorY+doorHeight
+          kind:"door",shape:spec.architecture.doorShape,edgeIndex:ei,floorIndex:floor,
+          centerAlongEdgeM:e.len/2,widthM,bottomM:floorY,topM:floorY+doorHeight,
+          ...(spec.architecture.doorShape==="arched"?{archRadiusM:Math.min(widthM/2,doorHeight*0.55)}:{})
         };
         openings.push(opening);
         structuralOpenings.push(opening);
@@ -407,18 +437,44 @@ export function generateProceduralGlb(rawSpec) {
 
   if(spec.architecture.includeDoor&&edges[front].len>=2.5&&!arcade.enabled){
     const e=edges[front];
-    const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
-    const widthM=Math.min(1.05,e.len*0.25),faceClearanceM=0.002;
+    const widthM=Math.min(1.05,e.len*0.25);
     const doorHeight=Math.min(2.16,floorH-0.05);
-    const doorCenterY=doorHeight/2;
-    const doorPoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
-    const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09,faceClearanceM));
-    const leftJamb=offsetFacadePoint(edgePoint,e,-(widthM/2+0.035),surfaceInsertCenterOffset(0.09,faceClearanceM));
-    const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2+0.035,surfaceInsertCenterOffset(0.09,faceClearanceM));
-    geo.box("door",doorPoint.x,doorCenterY,doorPoint.z,widthM,doorHeight,0.07,e.yaw);
-    geo.box("frame",framePoint.x,doorHeight+0.03,framePoint.z,widthM+0.14,0.08,0.09,e.yaw);
-    geo.box("frame",leftJamb.x,doorCenterY,leftJamb.z,0.07,doorHeight,0.09,e.yaw);
-    geo.box("frame",rightJamb.x,doorCenterY,rightJamb.z,0.07,doorHeight,0.09,e.yaw);
+    if(spec.architecture.doorShape==="arched"){
+      const centerU=e.len/2;
+      const archSegments=16;
+      const leafProfile=createFacadeOpeningProfile({
+        centerU,bottomM:0.035,widthM:Math.max(0.2,widthM-0.08),
+        heightM:doorHeight-0.07,shape:"arched",archSegments
+      });
+      addExtrudedFacadeProfile(geo,{
+        edge:e,baseY:0,profile:leafProfile,frontDepth:0.072,depthM:0.07,material:"door"
+      });
+
+      const frameOuter=createFacadeOpeningProfile({
+        centerU,bottomM:0,widthM:widthM+0.14,
+        heightM:Math.min(floorH-0.01,doorHeight+0.04),shape:"arched",archSegments
+      });
+      const frameInner=createFacadeOpeningProfile({
+        centerU,bottomM:0.035,widthM:Math.max(0.2,widthM-0.02),
+        heightM:doorHeight-0.035,shape:"arched",archSegments
+      });
+      addExtrudedFacadeProfile(geo,{
+        edge:e,baseY:0,profile:frameOuter,holes:[frameInner],
+        frontDepth:0.092,depthM:0.09,material:"frame"
+      });
+    }else{
+      const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
+      const faceClearanceM=0.002;
+      const doorCenterY=doorHeight/2;
+      const doorPoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
+      const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09,faceClearanceM));
+      const leftJamb=offsetFacadePoint(edgePoint,e,-(widthM/2+0.035),surfaceInsertCenterOffset(0.09,faceClearanceM));
+      const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2+0.035,surfaceInsertCenterOffset(0.09,faceClearanceM));
+      geo.box("door",doorPoint.x,doorCenterY,doorPoint.z,widthM,doorHeight,0.07,e.yaw);
+      geo.box("frame",framePoint.x,doorHeight+0.03,framePoint.z,widthM+0.14,0.08,0.09,e.yaw);
+      geo.box("frame",leftJamb.x,doorCenterY,leftJamb.z,0.07,doorHeight,0.09,e.yaw);
+      geo.box("frame",rightJamb.x,doorCenterY,rightJamb.z,0.07,doorHeight,0.09,e.yaw);
+    }
   }
 
   for(const opening of structuralOpenings){
