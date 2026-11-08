@@ -62,7 +62,7 @@ function createFetchMock(expectedStage) {
       assert.equal(body.model, "v3.1-20260211");
       assert.equal(body.texture, true);
       assert.equal(body.pbr, true);
-      assert.equal(body.auto_size, false);
+      assert.equal("auto_size" in body, false, "only documented image endpoint fields should be sent");
       assert.equal(body.enable_image_autofix, false);
       return jsonResponse({ code: 0, data: { task_id: "task_image_1234" } });
     }
@@ -72,6 +72,7 @@ function createFetchMock(expectedStage) {
       assert.match(init.headers?.Authorization ?? "", /^Bearer test-api-key$/);
       const body = JSON.parse(init.body);
       assert.equal(body.model, "v3.1-20260211");
+      assert.equal("auto_size" in body, false, "multiview endpoint must not receive undocumented auto_size");
       assert.deepEqual(body.inputs, [
         { front: fileTokens[0] },
         { left: fileTokens[1] },
