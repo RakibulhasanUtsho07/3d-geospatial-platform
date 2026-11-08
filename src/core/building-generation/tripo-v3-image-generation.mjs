@@ -157,6 +157,9 @@ export async function runTripoImageGeneration(options = {}) {
   const sourceIds = options.sourceIds.map(id => safeId(id, "sourceId"));
   if (new Set(sourceIds).size !== sourceIds.length) throw new TypeError("sourceIds must not contain duplicates.");
   const viewLabels = normalizeViewLabels(sourceIds, options.viewLabels);
+  if (sourceIds.length > 1 && options.confirmSameBuilding !== true) {
+    throw new TypeError("confirmSameBuilding must be true after checking that every labelled view depicts the same physical building.");
+  }
   const model = options.model ?? TRIPO_V3_DEFAULT_MODEL;
   const texture = options.texture ?? true;
   const pbr = options.pbr ?? true;
@@ -209,6 +212,7 @@ export async function runTripoImageGeneration(options = {}) {
     jobId,
     model,
     generationStage: images.length === 1 ? "image-to-model" : "multiview-to-model",
+    sameBuildingConfirmed: images.length > 1 && options.confirmSameBuilding === true,
     sources: images.map((image, index) => ({
       sourceId: image.sourceId,
       kind: image.kind,
