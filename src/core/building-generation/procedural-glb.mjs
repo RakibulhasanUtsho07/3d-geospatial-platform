@@ -339,7 +339,7 @@ function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings
   }
 }
 
-function encodeGlb(spec, geo, facadeOrientation, roofGeometry) {
+function encodeGlb(spec, geo, facadeOrientation, roofGeometry, structuralOpeningManifest) {
   const active=MATERIALS.filter(name=>geo.groups.get(name).indices.length), indexOf=new Map(active.map((name,i)=>[name,i]));
   const materials=active.map(name=>({name:name==="wall"?"Facade":name[0].toUpperCase()+name.slice(1),pbrMetallicRoughness:{baseColorFactor:rgba(({wall:spec.architecture.wallColor,roof:spec.architecture.roofColor,glass:spec.architecture.glassColor,frame:spec.architecture.frameColor,concrete:spec.architecture.concreteColor,door:spec.architecture.doorColor,metal:"#4B5563"})[name]),metallicFactor:name==="metal"?0.65:0,roughnessFactor:name==="glass"?0.24:0.78}}));
   const bins=[], views=[], accessors=[], meshes=[], nodes=[]; let offset=0;
@@ -355,7 +355,7 @@ function encodeGlb(spec, geo, facadeOrientation, roofGeometry) {
     const pa=accessor(pi,5126,g.positions.length/3,"VEC3",{min,max}),na=accessor(ni,5126,g.normals.length/3,"VEC3"),ia=accessor(ii,small?5123:5125,ivals.length,"SCALAR",{min:[lo],max:[hi]});
     meshes.push({name:spec.id+"-"+name,primitives:[{attributes:{POSITION:pa,NORMAL:na},indices:ia,material:indexOf.get(name),mode:4}]});nodes.push({name:spec.name+" - "+name,mesh:meshes.length-1});
   }
-  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,generatedRoofType:roofGeometry.generatedType,roofPeakHeightM:Number(roofGeometry.peakHeightM.toFixed(3)),facadeOrientation}}};
+  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,generatedRoofType:roofGeometry.generatedType,roofPeakHeightM:Number(roofGeometry.peakHeightM.toFixed(3)),facadeOrientation,structuralOpenings:structuralOpeningManifest}}};
   const jb=Buffer.from(JSON.stringify(gltf)), jp=(4-jb.length%4)%4, bp=(4-binary.length%4)%4;
   const json=Buffer.concat([jb,Buffer.alloc(jp,0x20)]), bin=bp?Buffer.concat([binary,Buffer.alloc(bp)]):binary, total=12+8+json.length+8+bin.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
@@ -767,7 +767,6 @@ export function generateProceduralGlb(rawSpec) {
     source:selectedFacade.source,
     reviewRequired:frontAxisNeedsReview||selectedFacade.reviewRequired
   };
-  const glb=encodeGlb(spec,geo,facadeOrientation,roofGeometry);
   const structuralOpeningRecords=structuralOpenings.map(opening=>({
     edgeIndex:opening.edgeIndex,floorIndex:opening.floorIndex,kind:opening.kind,shape:opening.shape,
     centerAlongEdgeM:Number(opening.centerAlongEdgeM.toFixed(3)),widthM:Number(opening.widthM.toFixed(3)),
@@ -776,6 +775,20 @@ export function generateProceduralGlb(rawSpec) {
     ...(opening.leafCount===undefined?{}:{leafCount:opening.leafCount}),
     confidence:opening.confidence,source:opening.source,reviewRequired:opening.reviewRequired
   }));
+  const structuralOpeningManifest={
+    schemaVersion:"1.0.0",
+    engine:"procedural-glb-v1",
+    method:"perimeter-wall-shell-through-apertures",
+    openingCount:structuralOpeningRecords.length,
+    openings:structuralOpeningRecords,
+    reviewRequired:structuralOpeningRecords.some(opening=>opening.reviewRequired),
+    limitations:[
+      "Opening positions and dimensions are procedural estimates, not independently measured architectural facts.",
+      "This manifest describes generated perimeter-wall apertures; it is not BIM-grade structural semantics.",
+      "Independent visual review and measured source evidence are required before acceptance or publication."
+    ]
+  };
+  const glb=encodeGlb(spec,geo,facadeOrientation,roofGeometry,structuralOpeningManifest);
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number(roofGeometry.peakHeightM.toFixed(2))},
@@ -783,6 +796,7 @@ export function generateProceduralGlb(rawSpec) {
     roof:{requestedType:roofGeometry.requestedType,generatedType:roofGeometry.generatedType,eaveHeightM:Number(roofGeometry.eaveHeightM.toFixed(3)),ridgeRiseM:Number(roofGeometry.ridgeRiseM.toFixed(3)),peakHeightM:Number(roofGeometry.peakHeightM.toFixed(3)),rectangularFootprint:roofGeometry.rectangularFootprint,reviewRequired:roofGeometry.reviewRequired},
     facadeOrientation,
     structuralOpenings:structuralOpeningRecords,
+    structuralOpeningManifest,
     facadeSelection:{
       method:selectedFacade.method,
       edgeIndex:front,
@@ -806,7 +820,8 @@ export function generateProceduralGlb(rawSpec) {
       frontDoor:frontDoorPlacement,
       frontColumns:frontColumnsPlacement,
       balconies:balconyPlacementRecords,
-      structuralOpenings:structuralOpeningRecords
+      structuralOpenings:structuralOpeningRecords,
+      structuralOpeningManifest
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
