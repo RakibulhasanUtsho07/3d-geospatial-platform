@@ -79,5 +79,4 @@ No real worker-host run, source-rights clearance, model licence approval, review
 - Parent D3M-ENGINE-04 exact-head Full CI: [#41789187557](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41789187557) passed on head \`53f9887834cfe960ea8875d6fc7d074430400611\`.
 - D3M-ENGINE-05 branch: \`feat/d3m-engine05-process-model-load-attestation-20261104\`.
 - Tracking issue: #354.
-- Current D3M-ENGINE-05 CI must run against the final branch head after all documentation and test changes. Keep the PR draft until exact-head CI and independent review are complete.
-- Merge order remains D3M-ENGINE-03 → D3M-ENGINE-04 → D3M-ENGINE-05. No branch is to be merged to \`main\` by this milestone.
+- Historical state: the PR-specific validation/review and stacked merge-order instructions above applied before the 2026-11-08 cumulative integration. The implementation is now on main through PR #409; do not replay this standalone branch.
