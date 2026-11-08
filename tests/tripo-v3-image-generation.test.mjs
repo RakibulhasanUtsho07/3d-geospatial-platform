@@ -37,7 +37,8 @@ function jsonResponse(data, status = 200) {
 function createFetchMock(expectedStage) {
   const calls = [];
   const fileTokens = [];
-  let pollCount = 0;
+  let modelPollCount = 0;
+  let multiviewPollCount = 0;
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(String(input));
     calls.push({ url: url.toString(), init });
@@ -66,25 +67,56 @@ function createFetchMock(expectedStage) {
       assert.equal(body.enable_image_autofix, false);
       return jsonResponse({ code: 0, data: { task_id: "task_image_1234" } });
     }
+    if (url.origin === "https://openapi.tripo3d.ai" && url.pathname === "/v3/generation/image-to-multiview") {
+      assert.equal(expectedStage, "image-to-multiview-then-multiview-to-model");
+      assert.equal(init.method, "POST");
+      assert.match(init.headers?.Authorization ?? "", /^Bearer test-api-key$/);
+      const body = JSON.parse(init.body);
+      assert.deepEqual(body, { input: fileTokens[0] });
+      return jsonResponse({ code: 0, data: { task_id: "task_views_1234" } });
+    }
     if (url.origin === "https://openapi.tripo3d.ai" && url.pathname === "/v3/generation/multiview-to-model") {
-      assert.equal(expectedStage, "multiview-to-model");
       assert.equal(init.method, "POST");
       assert.match(init.headers?.Authorization ?? "", /^Bearer test-api-key$/);
       const body = JSON.parse(init.body);
       assert.equal(body.model, "v3.1-20260211");
       assert.equal("auto_size" in body, false, "multiview endpoint must not receive undocumented auto_size");
-      assert.deepEqual(body.inputs, [
-        { front: fileTokens[0] },
-        { left: fileTokens[1] },
-      ]);
-      return jsonResponse({ code: 0, data: { task_id: "task_multi_1234" } });
+      if (expectedStage === "multiview-to-model") {
+        assert.deepEqual(body.inputs, [
+          { front: fileTokens[0] },
+          { left: fileTokens[1] },
+        ]);
+        return jsonResponse({ code: 0, data: { task_id: "task_multi_1234" } });
+      }
+      assert.equal(expectedStage, "image-to-multiview-then-multiview-to-model");
+      assert.deepEqual(body.inputs, [{ task_id: "task_views_1234" }]);
+      return jsonResponse({ code: 0, data: { task_id: "task_expanded_multi_1234" } });
     }
     if (url.origin === "https://openapi.tripo3d.ai" && url.pathname.startsWith("/v3/tasks/")) {
       assert.equal(init.method, "GET");
       assert.match(init.headers?.Authorization ?? "", /^Bearer test-api-key$/);
       const taskId = url.pathname.split("/").at(-1);
-      pollCount += 1;
-      if (pollCount === 1) return jsonResponse({ code: 0, data: { task_id: taskId, status: "queued", progress: 5 } });
+      if (taskId === "task_views_1234") {
+        multiviewPollCount += 1;
+        if (multiviewPollCount === 1) return jsonResponse({ code: 0, data: { task_id: taskId, status: "queued", progress: 5 } });
+        return jsonResponse({
+          code: 0,
+          data: {
+            task_id: taskId,
+            type: "image_to_multiview",
+            status: "success",
+            progress: 100,
+            output: {
+              generate_multiview_image: {
+                front_view_url: "https://cdn.tripo3d.ai/output/front.png",
+                left_view_url: "https://cdn.tripo3d.ai/output/left.png",
+              },
+            },
+          },
+        });
+      }
+      modelPollCount += 1;
+      if (modelPollCount === 1) return jsonResponse({ code: 0, data: { task_id: taskId, status: "queued", progress: 5 } });
       return jsonResponse({
         code: 0,
         data: {
@@ -103,7 +135,13 @@ function createFetchMock(expectedStage) {
     }
     throw new Error("Unexpected mocked Tripo URL: " + url.toString());
   };
-  return { fetchImpl, calls, fileTokens, get pollCount() { return pollCount; } };
+  return {
+    fetchImpl,
+    calls,
+    fileTokens,
+    get pollCount() { return modelPollCount; },
+    get multiviewPollCount() { return multiviewPollCount; },
+  };
 }
 
 async function createSourceInputs(root, sourceIds) {
@@ -202,6 +240,71 @@ test("runs labelled front/side multiview generation only when every selected sou
   assert.equal(workerReport.automaticApproval, false);
   assert.equal(mock.fileTokens.length, 2);
   assert.equal(mock.calls.filter(call => call.url.endsWith("/v3/generation/multiview-to-model")).length, 1);
+});
+
+test("optionally expands one actual photograph into synthetic multiview before the 3D model task", async t => {
+  const root = await workspace(t);
+  const mock = createFetchMock("image-to-multiview-then-multiview-to-model");
+  const sources = await createSourceInputs(root, ["front-photo"]);
+  const result = await runMediaToModelWorkflow({
+    workspaceRoot: root,
+    buildingSpec: fixture,
+    jobId: "tripo-synthetic-multiview",
+    strategy: "tripo-image",
+    sources,
+    viewSourceIds: ["front-photo"],
+    confirmRights: true,
+    confirmExternalProviderProcessing: true,
+    allowPaidProviderGeneration: true,
+    generateMultiviewFromSingleImage: true,
+    confirmSyntheticViewGeneration: true,
+    apiKey: "test-api-key",
+    fetchImpl: mock.fetchImpl,
+    tripoPollIntervalMs: 0,
+    tripoMaxPollAttempts: 3,
+  });
+  const report = result.report.modelReport;
+  assert.equal(report.generationStage, "image-to-multiview-then-multiview-to-model");
+  assert.deepEqual(report.generationStages, ["image-to-multiview", "multiview-to-model"]);
+  assert.equal(report.syntheticViewProvenance.kind, "ai-synthesized-from-single-image");
+  assert.equal(report.syntheticViewProvenance.generatedViewsAreIndependentObservations, false);
+  assert.equal(report.syntheticViewProvenance.eligibleAsSurveyEvidence, false);
+  assert.equal(report.syntheticViewProvenance.taskType, "image_to_multiview");
+  assert.deepEqual(report.syntheticViewProvenance.outputViewsAvailable.sort(), ["front_view_url", "left_view_url"]);
+  assert.equal(report.taskType, "multiview_to_model");
+  assert.equal(report.stageTaskIds.length, 2);
+  assert.equal(report.mapReady, false);
+  assert.equal(report.publicationEligible, false);
+  assert.equal(report.automaticApproval, false);
+  assert.equal(mock.fileTokens.length, 1);
+  assert.equal(mock.multiviewPollCount, 2);
+  assert.equal(mock.pollCount, 2);
+  assert.equal(mock.calls.filter(call => call.url.endsWith("/v3/generation/image-to-multiview")).length, 1);
+  assert.equal(mock.calls.filter(call => call.url.endsWith("/v3/generation/multiview-to-model")).length, 1);
+});
+
+test("requires explicit synthetic-view confirmation before the extra paid multiview stage", async t => {
+  const root = await workspace(t);
+  const mock = createFetchMock("image-to-multiview-then-multiview-to-model");
+  const sources = await createSourceInputs(root, ["front-photo"]);
+  await assert.rejects(
+    runMediaToModelWorkflow({
+      workspaceRoot: root,
+      buildingSpec: fixture,
+      jobId: "tripo-synthetic-multiview-unconfirmed",
+      strategy: "tripo-image",
+      sources,
+      viewSourceIds: ["front-photo"],
+      confirmRights: true,
+      confirmExternalProviderProcessing: true,
+      allowPaidProviderGeneration: true,
+      generateMultiviewFromSingleImage: true,
+      apiKey: "test-api-key",
+      fetchImpl: mock.fetchImpl,
+    }),
+    /confirmSyntheticViewGeneration=true/,
+  );
+  assert.equal(mock.calls.length, 0);
 });
 
 test("rejects missing paid-provider consent before creating workspace artefacts or making network requests", async t => {
