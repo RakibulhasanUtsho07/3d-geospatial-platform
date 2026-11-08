@@ -36,3 +36,8 @@ Model-cache readiness is not proof that inference will succeed: it does not inst
 The worker claims only compatible strategies. Unsupported jobs remain `queued` and do not consume retry attempts; `auto` maps to the procedural path. Probes run at worker startup, so restart after changing executable, Python, runner, cache or device configuration.
 
 The status endpoint returns the check timestamp, strategy state and bounded blocker/caveat descriptions. It does not expose executable paths, environment values, secrets, raw process output or model files. The status API uses `GENERATION_API_TOKEN` and `BUILDING_ENGINE_WORKSPACE`, sets `Cache-Control: no-store`, and shares the queue's persistent-workspace deployment constraint.
+
+
+## Real-host validation procedures
+
+A photogrammetry readiness result of ready means only that the configured COLMAP executable returned successfully for the four bounded --help probes. It does not execute a reconstruction. Use [COLMAP real-worker smoke procedure](COLMAP-REAL-WORKER-SMOKE.md) for a real queue-backed end-to-end job and record results in [its evidence log](evidence-templates/COLMAP-REAL-WORKER-SMOKE-LOG.md). Single-image readiness is likewise a precondition only; use [D3M-05 real single-image runtime smoke](D3M-05-SINGLE-IMAGE-RUNTIME-SMOKE.md) on the provisioned worker and independently verify its report/GLB.
