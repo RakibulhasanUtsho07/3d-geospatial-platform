@@ -23,6 +23,7 @@ const OPERATION_SCOPES_BY_STRATEGY = Object.freeze({
  procedural: ["procedural-model-derivation"],
  "single-image-ai": ["single-image-ai-reconstruction"],
  photogrammetry: ["photogrammetry-reconstruction", "texture-baking"],
+ "tripo-image": ["external-provider-image-generation"],
 });
 function safeId(value,label,max=80){
  if(typeof value!=="string"||value.length>max||!ID.test(value))throw new TypeError(label+" must be a valid identifier of at most "+max+" characters");
@@ -130,6 +131,27 @@ function parseSource(source){
  return {sourceId,relativePath:source.relativePath,licence:source.licence.trim(),permittedOperations,author:source.author,attribution:source.attribution,sourceUrl:source.sourceUrl,capturedAt:source.capturedAt,description:source.description,kind:source.kind??"auto",captureLocation:source.captureLocation};
 }
 function hashBytes(buffer){return createHash("sha256").update(buffer).digest("hex");}
+
+function normalizeTripoViewLabels(viewIds,value){
+ const allowed=["front","left","back","right"];
+ if(viewIds.length===1){
+  if(value===undefined||value===null)return null;
+  if(!value||typeof value!=="object"||Array.isArray(value))throw new TypeError("viewLabels must be an object");
+  const keys=Object.keys(value);
+  if(keys.length===0)return null;
+  if(keys.length!==1||value.front!==viewIds[0])throw new TypeError("single-image tripo-image may only label its selected source as front");
+  return {front:viewIds[0]};
+ }
+ if(!value||typeof value!=="object"||Array.isArray(value))throw new TypeError("multi-view tripo-image requires explicit viewLabels");
+ const keys=Object.keys(value);
+ if(keys.some(key=>!allowed.includes(key)))throw new TypeError("viewLabels contains an unsupported view name");
+ if(keys.length<2||keys.length>4||!Object.hasOwn(value,"front"))throw new TypeError("multi-view tripo-image requires a front view and at least one additional labelled view");
+ const ids=keys.map(key=>safeId(value[key],"viewLabels."+key));
+ if(new Set(ids).size!==ids.length)throw new TypeError("each selected source must have exactly one view label");
+ if(ids.length!==viewIds.length||viewIds.some(id=>!ids.includes(id)))throw new TypeError("viewLabels must map every and only the selected viewSourceIds");
+ return Object.fromEntries(allowed.filter(key=>Object.hasOwn(value,key)).map(key=>[key,value[key]]));
+}
+
 function sourceIdsFromViewOption(value,available){
  const chosen=value===undefined?available:value;
  if(!Array.isArray(chosen))throw new TypeError("viewSourceIds must be an array");
@@ -151,7 +173,7 @@ export async function runMediaToModelWorkflow(options){
  const root=await realpath(path.resolve(options.workspaceRoot));
  const jobId=safeId(options.jobId,"jobId",60);
  const strategy=options.strategy??"procedural";
- if(!["procedural","auto","single-image-ai","photogrammetry"].includes(strategy))throw new TypeError("strategy must be procedural, auto, single-image-ai or photogrammetry");
+ if(!["procedural","auto","single-image-ai","photogrammetry","tripo-image"].includes(strategy))throw new TypeError("strategy must be procedural, auto, single-image-ai, photogrammetry or tripo-image");
  const base=normalizeBuildingSpec(options.buildingSpec).spec;
  const buildingId=safeId(base.id,"buildingId");
  if(!Array.isArray(options.sources))throw new TypeError("sources must be an array");
@@ -160,13 +182,17 @@ export async function runMediaToModelWorkflow(options){
  if(new Set(sourceInputs.map(s=>s.sourceId)).size!==sourceInputs.length)throw new TypeError("source IDs must be unique");
  if(sourceInputs.length&&options.confirmRights!==true)throw new TypeError("confirmRights must be true after checking rights for every provided media source");
  if(strategy==="single-image-ai"&&options.confirmSingleViewInference!==true)throw new TypeError("single-image-ai requires confirmSingleViewInference=true because unseen geometry is inferred");
+ if(strategy==="tripo-image"&&(options.allowPaidProviderGeneration!==true||options.confirmExternalProviderProcessing!==true)){
+  throw new TypeError("tripo-image requires allowPaidProviderGeneration=true and confirmExternalProviderProcessing=true; selected source images will be sent to the paid external provider");
+ }
  const effectiveStrategy = strategy === "auto" ? (options.enablePhotogrammetry === true ? "photogrammetry" : "procedural") : strategy;
  const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[effectiveStrategy];
+ const earlyRequiredOperationScopes = effectiveStrategy==="tripo-image"?[]:requiredOperationScopes;
  for (const source of sourceInputs) {
   if (source.kind === "video" && !source.permittedOperations.includes("video-frame-extraction")) {
    throw new TypeError("video source " + source.sourceId + " must explicitly permit video-frame-extraction before media intake");
   }
-  const missingScopes = requiredOperationScopes.filter(scope => !source.permittedOperations.includes(scope));
+  const missingScopes = earlyRequiredOperationScopes.filter(scope => !source.permittedOperations.includes(scope));
   if (missingScopes.length) {
    throw new TypeError("source " + source.sourceId + " lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
   }
@@ -226,6 +252,16 @@ export async function runMediaToModelWorkflow(options){
   mcResolution:options.mcResolution??256,
   pretrainedModelNameOrPath:options.pretrainedModelNameOrPath??"stabilityai/TripoSR",
   singleImageTimeoutMs:options.singleImageTimeoutMs??1800000,
+  allowPaidProviderGeneration:options.allowPaidProviderGeneration===true,
+  confirmExternalProviderProcessing:options.confirmExternalProviderProcessing===true,
+  viewLabels:options.viewLabels===undefined?null:jsonSafe(options.viewLabels),
+  tripoModel:options.tripoModel??"v3.1-20260211",
+  tripoTexture:options.tripoTexture??true,
+  tripoPbr:options.tripoPbr??true,
+  tripoGeometryQuality:options.tripoGeometryQuality??"detailed",
+  tripoTextureQuality:options.tripoTextureQuality??"detailed",
+  tripoPollIntervalMs:options.tripoPollIntervalMs??5000,
+  tripoMaxPollAttempts:options.tripoMaxPollAttempts??120,
   controlPoints:options.controlPoints===undefined?null:jsonSafe(options.controlPoints),
   maxGcpRmsErrorM:options.maxGcpRmsErrorM??0.5,
   maxGcpResidualM:options.maxGcpResidualM??1,
@@ -391,12 +427,14 @@ export async function runMediaToModelWorkflow(options){
   const syncedSpec=specSync.artifact.payload.buildingSpec;
   const viewIds=specSync.artifact.payload.viewIds;
   if(!syncedSpec||!Array.isArray(viewIds))throw new TypeError("stored building-spec-sync artifact is incomplete");
+  const normalizedViewLabels = effectiveStrategy==="tripo-image" ? normalizeTripoViewLabels(viewIds, options.viewLabels) : null;
+  if(effectiveStrategy==="tripo-image"&&(viewIds.length<1||viewIds.length>4))throw new TypeError("tripo-image requires one image or two to four selected views");
   await atomicJson(specPath,syncedSpec);
   runReport.inputs.mediaRecords=mediaRecords;
   runReport.inputs.selectedViewIds=viewIds;
   runReport.selectedSourceManifest=specSync.artifact.payload.selectedSourceManifest;
 
-  const effectiveScopeIds = effectiveStrategy === "single-image-ai" || effectiveStrategy === "photogrammetry"
+  const effectiveScopeIds = effectiveStrategy === "single-image-ai" || effectiveStrategy === "photogrammetry" || effectiveStrategy === "tripo-image"
     ? viewIds
     : [...new Set([...mediaRecords.map(item => item.id), ...explicitlySelected])];
   const scopedSources = new Map((syncedSpec.sources ?? []).map(source => [source.id, source]));
@@ -423,6 +461,12 @@ export async function runMediaToModelWorkflow(options){
     runnerScript:config.runnerScript,pythonPath:config.pythonPath,device:config.device,
     mcResolution:config.mcResolution,pretrainedModelNameOrPath:config.pretrainedModelNameOrPath,
     singleImageTimeoutMs:config.singleImageTimeoutMs,
+    viewLabels:normalizedViewLabels,
+    allowPaidProviderGeneration:config.allowPaidProviderGeneration,
+    confirmExternalProviderProcessing:config.confirmExternalProviderProcessing,
+    tripoModel:config.tripoModel,tripoTexture:config.tripoTexture,tripoPbr:config.tripoPbr,
+    tripoGeometryQuality:config.tripoGeometryQuality,tripoTextureQuality:config.tripoTextureQuality,
+    tripoPollIntervalMs:config.tripoPollIntervalMs,tripoMaxPollAttempts:config.tripoMaxPollAttempts,
    },
   });
   const modelStage=await runStateStage({
@@ -438,7 +482,7 @@ export async function runMediaToModelWorkflow(options){
     if(hashBytes(bytes)!==artifact.payload.modelSha256)throw new TypeError("cached model output checksum mismatch");
    },
    execute:async currentJob=>{
-    const planSuffix=strategy==="photogrammetry"?"colmap":strategy==="single-image-ai"?"single-image":"procedural";
+    const planSuffix=strategy==="photogrammetry"?"colmap":strategy==="single-image-ai"?"single-image":strategy==="tripo-image"?"tripo":"procedural";
     const attempt=currentJob.stages.find(stage=>stage.id==="model-generation")?.attempts??1;
     const workerJobId=safeId(jobId.slice(0,35)+"-"+hashBytes(Buffer.from(jobId)).slice(0,8)+"-"+planSuffix+"-"+attempt,"workerJobId");
     const result=await generateBuildingAsset(syncedSpec,{
@@ -456,6 +500,15 @@ export async function runMediaToModelWorkflow(options){
       device:config.device,mcResolution:config.mcResolution,pretrainedModelNameOrPath:config.pretrainedModelNameOrPath,
       timeoutMs:config.singleImageTimeoutMs,allowSingleViewInference:options.confirmSingleViewInference===true,
       ...(typeof options.spawnImpl === "function" ? { spawnImpl: options.spawnImpl } : {}),
+     },
+     tripoImage:{
+      workspaceRoot:root,jobId:workerJobId,sourceIds:viewIds,viewLabels:normalizedViewLabels,
+      allowPaidProviderGeneration:options.allowPaidProviderGeneration===true,
+      confirmExternalProviderProcessing:options.confirmExternalProviderProcessing===true,
+      apiKey:options.apiKey,model:config.tripoModel,texture:config.tripoTexture,pbr:config.tripoPbr,
+      geometryQuality:config.tripoGeometryQuality,textureQuality:config.tripoTextureQuality,
+      pollIntervalMs:config.tripoPollIntervalMs,maxPollAttempts:config.tripoMaxPollAttempts,
+      ...(typeof options.fetchImpl==="function"?{fetchImpl:options.fetchImpl}:{}),
      },
     });
     let modelBytes;
