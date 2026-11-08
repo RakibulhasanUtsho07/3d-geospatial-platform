@@ -1,5 +1,7 @@
 # D3M-ENGINE-07 — Single-image generation artifact receipt
 
+> **Mainline integration status — 2026-11-08:** This document records a historical feature/development slice. Its cumulative implementation is already included in main by [PR #409](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/409) (integration commit 0df5de366e6d2b732203f075f58de663bcf14b9d). Branch names, stacked-base instructions, draft/CI status and merge-order notes below describe the pre-integration history; do **not** merge or replay the old feature branch independently. The current single-image smoke/receipt versions are 1.6.0/1.2.0; vertical control evidence uses manifest schema 1.1.0 and georeference schema 1.1.0 where supplied. This software integration does **not** mean a real TripoSR/rembg worker-host inference or human/survey acceptance has occurred. Those operational gates remain **NOT RUN** until real evidence is recorded.
+
 **Tracking issue:** [#356](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/356)  
 **Implementation branch:** `feat/d3m-engine07-generation-artifact-receipt-20261104`  
 **Base:** D3M-ENGINE-06 PR [#355](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/355)  
