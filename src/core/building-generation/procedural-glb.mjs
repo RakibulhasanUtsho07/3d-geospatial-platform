@@ -347,7 +347,7 @@ export function generateProceduralGlb(rawSpec) {
   const roofRiseM = pitchedRoof
     ? spec.architecture.roofRiseM ?? Math.min(2.5, Math.max(0.5, spec.dimensions.floorCount * spec.dimensions.floorHeightM * 0.15))
     : 0;
-  const roofBaseY = height + spec.dimensions.parapetHeightM;
+  const roofBaseY = spec.dimensions.floorCount * spec.dimensions.floorHeightM + spec.dimensions.parapetHeightM;
   const roofProfile = pitchedRoof ? {
     requestedType: requestedRoofType,
     generatedStyle: roofStyle,
