@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trusted-survey-device-public-key-registry:1.0.0",
+  "title": "Trusted survey device public-key registry",
+  "description": "External public-key-only enrollment registry. It does not establish manufacturer certification or hardware attestation by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "recordType",
+    "registryId",
+    "issuedAtUtc",
+    "expiresAtUtc",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "recordType": {
+      "const": "trusted-survey-device-public-key-registry"
+    },
+    "registryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "issuedAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "expiresAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "manufacturerId",
+          "modelId",
+          "deviceSerialCommitmentSha256",
+          "enrollmentEvidenceSha256",
+          "keyId",
+          "status",
+          "publicKeyPem",
+          "validFromUtc",
+          "validUntilUtc",
+          "revokedAtUtc",
+          "replacesKeyId"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "manufacturerId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "modelId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "deviceSerialCommitmentSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "enrollmentEvidenceSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "keyId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          },
+          "publicKeyPem": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 16384,
+            "not": {
+              "pattern": "PRIVATE KEY"
+            }
+          },
+          "validFromUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntilUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAtUtc": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
+          "replacesKeyId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

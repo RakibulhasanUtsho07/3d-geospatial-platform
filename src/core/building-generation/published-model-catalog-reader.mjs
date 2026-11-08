@@ -52,6 +52,39 @@ function validateReview(review, label) {
   if (!nonEmptyString(review.notes) || review.notes.length > 4000) {
     throw new TypeError(label + ".review.notes is required (max 4000 characters).");
   }
+  if (review.authentication !== undefined) {
+    const auth = review.authentication;
+    const authFields = [
+      "scheme",
+      "reviewerId",
+      "keyId",
+      "registryId",
+      "reviewedAtUtc",
+      "publicKeyFingerprintSha256",
+      "signatureSha256",
+      "signedPayloadSha256",
+      "signedReviewReceiptSha256",
+    ];
+    if (!isRecord(auth) ||
+        Object.keys(auth).length !== authFields.length ||
+        Object.keys(auth).some((key) => !authFields.includes(key)) ||
+        authFields.some((key) => !Object.prototype.hasOwnProperty.call(auth, key))) {
+      throw new TypeError(label + ".review.authentication must contain exactly the documented signature-provenance fields.");
+    }
+    if (auth.scheme !== "Ed25519" ||
+        !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(auth.reviewerId ?? "") ||
+        auth.reviewerId !== review.reviewer ||
+        !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(auth.keyId ?? "") ||
+        !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(auth.registryId ?? "") ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(auth.reviewedAtUtc ?? "") ||
+        auth.reviewedAtUtc !== review.reviewedAt ||
+        !isHash(auth.publicKeyFingerprintSha256) ||
+        !isHash(auth.signatureSha256) ||
+        !isHash(auth.signedPayloadSha256) ||
+        !isHash(auth.signedReviewReceiptSha256)) {
+      throw new TypeError(label + ".review.authentication contains invalid or mismatched Ed25519 provenance.");
+    }
+  }
 }
 
 function validateVersion(model, version, index) {
@@ -164,6 +197,7 @@ export function getActivePublishedModels(raw) {
         reviewer: version.review.reviewer,
         reviewedAt: version.review.reviewedAt,
         checks: { ...version.review.checks },
+        ...(version.review.authentication ? { authentication: { ...version.review.authentication } } : {}),
       },
     };
   });

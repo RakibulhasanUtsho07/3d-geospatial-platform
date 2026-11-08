@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -9,10 +10,11 @@ function usage() {
   console.log("Publish one reviewed generation job into the versioned GLB catalog.");
   console.log("");
   console.log("Usage:");
-  console.log("  npm run publish:approved-generation-job -- <workspaceRoot> <jobId> --longitude <deg> --latitude <deg> --height <metres>");
+  console.log("  npm run publish:approved-generation-job -- <workspaceRoot> <jobId> --review-receipt <receipt.json> --longitude <deg> --latitude <deg> --height <metres>");
   console.log("");
   console.log("Optional placement: --heading <deg> --pitch <deg> --roll <deg> --scale <factor> --up-axis X|Y|Z --forward-axis X|Y|Z");
   console.log("Height is interpreted as WGS84 ellipsoid height. The complete transform must match the immutable approved review exactly.");
+  console.log("The signed Ed25519 receipt must bind the exact review record, GLB, QA report and placement; trust anchors come from RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON.");
   console.log("Publication is explicit; no job is published automatically.");
 }
 function numberOption(value, name) {
@@ -36,6 +38,7 @@ async function main() {
       scale: { type: "string", default: "1" },
       "up-axis": { type: "string", default: "Y" },
       "forward-axis": { type: "string", default: "Z" },
+      "review-receipt": { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -45,6 +48,15 @@ async function main() {
     return;
   }
   if (positionals.length !== 2) throw new TypeError("Expected workspaceRoot and jobId.");
+  if (typeof values["review-receipt"] !== "string") {
+    throw new TypeError("--review-receipt is required.");
+  }
+  const receiptPath = path.resolve(values["review-receipt"]);
+  const receiptInfo = await lstat(receiptPath);
+  if (receiptInfo.isSymbolicLink() || !receiptInfo.isFile() || receiptInfo.size < 1 || receiptInfo.size > 8 * 1024) {
+    throw new TypeError("--review-receipt must identify a regular JSON file no larger than 8 KiB.");
+  }
+  const reviewReceipt = JSON.parse(await readFile(receiptPath, "utf8"));
   const longitude = numberOption(values.longitude, "--longitude");
   const latitude = numberOption(values.latitude, "--latitude");
   const height = numberOption(values.height, "--height");
@@ -55,6 +67,7 @@ async function main() {
   const result = await publishApprovedGenerationJob({
     workspaceRoot: path.resolve(positionals[0]),
     jobId: positionals[1],
+    reviewReceipt,
     placement: {
       position: { longitude, latitude, height },
       heightReference: "WGS84-ellipsoid",
@@ -77,6 +90,9 @@ async function main() {
     placement: result.placement,
     placementHeightReference: result.placementHeightReference,
     placementSha256: result.placementSha256,
+    signedReviewPayloadSha256: result.signedReviewPayloadSha256,
+    signedReviewReceiptSha256: result.signedReviewReceiptSha256,
+    reviewerAuthentication: result.reviewerAuthentication,
     mapReady: false,
     publicationEligible: false,
     note: result.note,

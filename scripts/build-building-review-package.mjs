@@ -8,6 +8,7 @@ import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-te
 import { verifyRenderCorrectionTasks } from "../src/core/building-generation/render-correction-verification.mjs";
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
+import { prepareSingleImageReviewPackageEvidence } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const semanticDigest = (value) => sha256(Buffer.from(JSON.stringify(value)));
@@ -47,11 +48,30 @@ function addArtifact(artifacts, copyOperations, { artifactType, sourcePath, rela
 }
 
 async function main() {
+  const positional = [];
+  const options = {};
+  const rawArgs = process.argv.slice(2);
+  for (let index = 0; index < rawArgs.length; index++) {
+    const value = rawArgs[index];
+    if (value === "--single-image-smoke-workspace" || value === "--single-image-smoke-job-id") {
+      if (Object.hasOwn(options, value) || !rawArgs[index + 1] || rawArgs[index + 1].startsWith("--")) {
+        throw new Error("Single-image smoke options must each be supplied once with a value.");
+      }
+      options[value] = rawArgs[++index];
+    } else if (value.startsWith("--")) {
+      throw new Error("Unknown review-package option: " + value);
+    } else {
+      positional.push(value);
+    }
+  }
   const [glbArg, renderDirArg, referenceDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, readinessArg, outputArg] =
-    process.argv.slice(2);
+    positional;
+  const hasSmokeWorkspace = Object.hasOwn(options, "--single-image-smoke-workspace");
+  const hasSmokeJobId = Object.hasOwn(options, "--single-image-smoke-job-id");
   if (!glbArg || !renderDirArg || !referenceDirArg || !reviewArg || !backlogArg ||
-    !verificationArg || !accuracyEvidenceArg || !readinessArg || !outputArg || process.argv.length !== 11) {
-    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json> <new-output-directory>");
+    !verificationArg || !accuracyEvidenceArg || !readinessArg || !outputArg || positional.length !== 9 ||
+    hasSmokeWorkspace !== hasSmokeJobId) {
+    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json> <new-output-directory> [--single-image-smoke-workspace <private-workspace> --single-image-smoke-job-id <job-id>]");
   }
 
   const glbPath = path.resolve(glbArg);
@@ -83,6 +103,20 @@ async function main() {
 
   const candidateGlbSha256 = sha256(glbBytes);
   const renderManifestSha256 = sha256(manifestBytes);
+  const singleImageSmokeEvidence = hasSmokeWorkspace
+    ? await prepareSingleImageReviewPackageEvidence({
+      workspaceRoot: options["--single-image-smoke-workspace"],
+      jobId: options["--single-image-smoke-job-id"],
+      buildingId: renderReferenceReview.buildingId,
+      candidateGlbSha256,
+      trustedSurveyorRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
+      trustedDeviceRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON ?? null,
+      trustedEnrollmentAuthorityRegistry: process.env.SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON ?? null,
+      trustRegistryGovernanceAttestation: process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_ATTESTATION_JSON ?? null,
+      trustRegistryGovernancePublicKeyPem: process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_PUBLIC_KEY_PEM ?? null,
+      minimumTrustRegistrySequence: process.env.SURVEY_TRUST_REGISTRY_MINIMUM_SEQUENCE ?? null,
+    })
+    : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
   const textureQa = reviewGlbTextureBindings(glbBytes);
   // These are the exact report-file bytes included in the immutable package.
@@ -184,6 +218,23 @@ async function main() {
     });
   }
 
+  if (singleImageSmokeEvidence) {
+    for (const evidenceFile of singleImageSmokeEvidence.files) {
+      addArtifact(artifacts, copyOperations, {
+        artifactType: evidenceFile.artifactType,
+        sourcePath: null,
+        relativePath: evidenceFile.relativePath,
+        bytes: evidenceFile.bytes,
+        metadata: evidenceFile.artifactType === "single-image-survey-device-enrollment-evidence" ? {
+          deviceId: evidenceFile.deviceId,
+          authorityId: evidenceFile.authorityId,
+          authorityType: evidenceFile.authorityType,
+          authorityRegistryId: evidenceFile.authorityRegistryId,
+        } : {},
+      });
+    }
+  }
+
   for (const view of renderManifest.views ?? []) {
     const actual = renderFileBytes.get(view.filename);
     if (!actual) continue;
@@ -226,7 +277,33 @@ async function main() {
     "3. Open render images under \`renders/\` beside their corresponding evidence images under \`references/\`.",
     "4. Read \`reports/render-reference-review.json\`, \`reports/correction-tasks.json\` and \`reports/correction-verification.json\`.",
     "5. Review \`reports/geometry-qa.json\` and \`reports/texture-qa.json\`; structural QA cannot prove historical or architectural accuracy.",
-    "6. Record a separate human release decision outside this automated package.",
+    ...(singleImageSmokeEvidence ? [
+      ...(singleImageSmokeEvidence.verticalDatum === "EPSG:4979-ellipsoidal" ? [
+        "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal and ellipsoidal-height offsets reuse one scale and remain human-review-only. Vertical survey observations are operator-supplied, not independently authenticated.",
+      ] : [
+        "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
+      ]),
+      ...(singleImageSmokeEvidence.schemaVersion === "1.6.0" ? [
+        "7. Inspect the exact enrollment statement under `evidence/device-enrollments/`. Offline verification requires the current D3M-17 device registry and the separate `SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON` registry; one immutable signed enrollment document is verified for each distinct device identity, regardless of key rotation.",
+        "8. This authority signature links exact enrollment bytes and device identity commitments to an operator-trusted authority key. It does not prove legal manufacturer identity, certificate-chain validity, secure-element custody, firmware integrity, genuine receiver capture or measurement accuracy.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.5.0" ? [
+        "7. Inspect each byte-preserved held-out record, surveyor attribution sidecar and adjacent `*.device-attestation.json` sidecar. Offline verification requires both external registries and binds both signatures to exact record, manifest and checkpoint bytes.",
+        "8. A device-key signature establishes key possession and declared record association only; it does not prove manufacturer certification, secure-element custody, genuine receiver capture or measurement accuracy.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.4.0" ? [
+        "7. Inspect each byte-preserved held-out survey observation and its adjacent `*.attestation.json` sidecar under `evidence/survey-observations/`. Offline package verification requires the external `SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON` registry and confirms exact record/manifest/checkpoint binding plus active Ed25519 key signatures.",
+        "8. A valid signature attributes the exact record/checkpoint statement to a registered key; it does not prove civil identity, surveyor qualification, receiver hardware authenticity, rights, CRS correctness, measurement accuracy or physical feature correspondence.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.3.0" ? [
+        "7. Inspect every byte-preserved original held-out survey observation under `evidence/survey-observations/`; compare observation IDs and SHA-256 values with the control-point manifest. These bytes are hash-bound, not independently authenticated.",
+        "8. Record a separate human release decision outside this automated package.",
+      ] : [
+        "7. Record a separate human release decision outside this automated package.",
+      ]),
+    ] : [
+      "6. Record a separate human release decision outside this automated package.",
+    ]),
     "",
     "The packet does not mark the candidate publication-eligible and does not contain an automated publication action.",
     "",
@@ -244,6 +321,7 @@ async function main() {
     readinessReport: recomputedReadiness,
     renderManifestViews: renderManifest.views,
     artifacts,
+    singleImageEvidence: singleImageSmokeEvidence,
   });
   const packageManifestBytes = Buffer.from(JSON.stringify(packageManifest, null, 2) + "\n");
   copyOperations.push({ sourcePath: null, relativePath: "package-manifest.json", bytes: packageManifestBytes });

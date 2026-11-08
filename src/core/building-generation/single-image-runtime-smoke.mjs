@@ -18,8 +18,14 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
+import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
+import { canonicalJson, writeGenerationArtifactReceipt } from "./generation-artifact-receipt.mjs";
+import {
+  createSingleImageGeoreferenceEvidence,
+  loadSingleImageControlPointManifest,
+} from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.6.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -31,22 +37,327 @@ const OFFLINE_ENV = Object.freeze({
   HF_DATASETS_OFFLINE: "1",
   HF_HUB_DISABLE_TELEMETRY: "1",
 });
-const OFFLINE_SITE_CUSTOMIZE = [
-  "import socket",
-  "def _deny_runtime_network(*args, **kwargs):",
-  "    raise OSError('network access is disabled by the single-image runtime smoke')",
-  "socket.socket.connect = _deny_runtime_network",
-  "socket.socket.connect_ex = _deny_runtime_network",
-  "socket.socket.send = _deny_runtime_network",
-  "socket.socket.sendall = _deny_runtime_network",
-  "socket.socket.sendto = _deny_runtime_network",
-  "socket.socket.sendmsg = _deny_runtime_network",
-  "socket.create_connection = _deny_runtime_network",
-  "socket.getaddrinfo = _deny_runtime_network",
-  "socket.gethostbyname = _deny_runtime_network",
-  "socket.gethostbyname_ex = _deny_runtime_network",
-  "",
-].join("\n");
+export const SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE = String.raw`import builtins, hashlib, importlib, io, json, os, socket, stat, sys
+
+def _deny_runtime_network(*args, **kwargs):
+    raise OSError('network access is disabled by the single-image runtime smoke')
+
+socket.socket.connect = _deny_runtime_network
+socket.socket.connect_ex = _deny_runtime_network
+socket.socket.send = _deny_runtime_network
+socket.socket.sendall = _deny_runtime_network
+socket.socket.sendto = _deny_runtime_network
+socket.socket.sendmsg = _deny_runtime_network
+socket.create_connection = _deny_runtime_network
+socket.getaddrinfo = _deny_runtime_network
+socket.gethostbyname = _deny_runtime_network
+socket.gethostbyname_ex = _deny_runtime_network
+
+_RECEIPT = os.environ.get('BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH')
+try:
+    _EXPECTED = json.loads(os.environ.get('BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON', '{}'))
+except Exception:
+    _EXPECTED = {}
+_PATCHED = set()
+_ROLE_BY_LOADER = {
+    'omegaconf.OmegaConf.load': 'tripoConfig',
+    'torch.load': 'tripoCheckpoint',
+    'onnxruntime.InferenceSession': 'rembgWeights',
+}
+_MAX_ONNX_BYTES = 512 * 1024 * 1024
+_SOURCE_RECEIPT = os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH')
+_SOURCE_EXPECTED_PATH = (
+    os.path.realpath(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH'))
+    if os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH') else None
+)
+try:
+    _SOURCE_EXPECTED = json.loads(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON', '{}'))
+except Exception:
+    _SOURCE_EXPECTED = {}
+_SOURCE_BYTES = None
+_SOURCE_RECEIPT_WRITTEN = False
+_MAX_SOURCE_BYTES = 20 * 1024 * 1024
+
+def _signature(item):
+    return (
+        item.st_dev, item.st_ino, item.st_size,
+        getattr(item, 'st_mtime_ns', int(item.st_mtime * 1000000000)),
+        getattr(item, 'st_ctime_ns', int(item.st_ctime * 1000000000)),
+    )
+
+def _hash_open_file(handle):
+    before = os.fstat(handle.fileno())
+    if not stat.S_ISREG(before.st_mode) or before.st_size <= 0:
+        return None, None, False
+    digest = hashlib.sha256()
+    total = 0
+    handle.seek(0)
+    while True:
+        chunk = handle.read(8 * 1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+        total += len(chunk)
+    handle.seek(0)
+    after = os.fstat(handle.fileno())
+    try:
+        path_after = os.stat(handle.name)
+    except Exception:
+        return None, None, False
+    stable = (
+        _signature(before) == _signature(after) == _signature(path_after)
+        and total == after.st_size
+    )
+    return digest.hexdigest(), total, stable
+
+def _append_receipt(loader, digest, byte_count, stable):
+    role = _ROLE_BY_LOADER.get(loader)
+    expected = _EXPECTED.get(role) if role else None
+    if not role or not isinstance(expected, dict):
+        return
+    if not stable:
+        raise OSError('model artifact changed while its loader was reading it')
+    if digest != expected.get('sha256') or byte_count != expected.get('bytes'):
+        return
+    if not isinstance(_RECEIPT, str) or not _RECEIPT:
+        raise OSError('model-load receipt destination is unavailable')
+    event = {
+        'schemaVersion': '1.0.0',
+        'role': role,
+        'loader': loader,
+        'bytes': byte_count,
+        'sha256': digest,
+        'exactBytesPassed': True,
+        'stable': True,
+    }
+    payload = (json.dumps(event, sort_keys=True, separators=(',', ':')) + '\n').encode('utf-8')
+    flags = os.O_WRONLY | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0)
+    descriptor = os.open(_RECEIPT, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError('model-load receipt is not a regular file')
+        written = 0
+        while written < len(payload):
+            written += os.write(descriptor, payload[written:])
+    finally:
+        os.close(descriptor)
+
+def _tracked_file_loader(loader, original, file_value, args, kwargs):
+    if not isinstance(file_value, (str, bytes, os.PathLike)):
+        raise OSError('model loader received an unsupported file-object input; exact loader bytes cannot be attested')
+    if loader == 'torch.load' and kwargs.get('mmap') is True:
+        raise OSError('mmap checkpoint loading is unsupported by model-load attestation')
+    with open(file_value, 'rb') as handle:
+        digest, byte_count, stable = _hash_open_file(handle)
+        role = _ROLE_BY_LOADER[loader]
+        expected = _EXPECTED.get(role, {})
+        if not stable:
+            raise OSError('model artifact could not be fingerprinted through a stable file descriptor')
+        if digest != expected.get('sha256') or byte_count != expected.get('bytes'):
+            raise OSError('model loader input bytes do not match the pre-inference fingerprint')
+        if loader == 'omegaconf.OmegaConf.load':
+            text_handle = io.TextIOWrapper(handle, encoding='utf-8')
+            try:
+                result = original(text_handle, *args, **kwargs)
+            finally:
+                try:
+                    text_handle.detach()
+                except Exception:
+                    pass
+        else:
+            result = original(handle, *args, **kwargs)
+        after_digest, after_bytes, after_stable = _hash_open_file(handle)
+        stable_after_load = (
+            after_stable and digest == after_digest and byte_count == after_bytes
+        )
+        if not stable_after_load:
+            raise OSError('model artifact changed during its loader call')
+        _append_receipt(loader, digest, byte_count, stable_after_load)
+        return result
+
+def _tracked_onnx_session(original_init, instance, model_path_or_bytes, args, kwargs):
+    if isinstance(model_path_or_bytes, (str, os.PathLike)):
+        model_path = os.fspath(model_path_or_bytes)
+        with open(model_path, 'rb') as handle:
+            before = os.fstat(handle.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_ONNX_BYTES:
+                raise OSError('rembg ONNX model file is not a supported regular file')
+            model_bytes = handle.read(_MAX_ONNX_BYTES + 1)
+            after = os.fstat(handle.fileno())
+            try:
+                path_after = os.stat(model_path)
+            except Exception:
+                raise OSError('rembg ONNX model path changed during read')
+            stable = (
+                _signature(before) == _signature(after) == _signature(path_after)
+                and len(model_bytes) == after.st_size
+                and len(model_bytes) <= _MAX_ONNX_BYTES
+            )
+        if not stable:
+            raise OSError('rembg ONNX model changed while its bytes were captured')
+        digest = hashlib.sha256(model_bytes).hexdigest()
+        expected = _EXPECTED.get('rembgWeights', {})
+        if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
+            raise OSError('rembg model-loader bytes do not match the pre-inference fingerprint')
+        result = original_init(instance, model_bytes, *args, **kwargs)
+        _append_receipt(
+            'onnxruntime.InferenceSession', digest, len(model_bytes), True
+        )
+        return result
+    if isinstance(model_path_or_bytes, (bytes, bytearray, memoryview)):
+        model_bytes = bytes(model_path_or_bytes)
+        if not model_bytes or len(model_bytes) > _MAX_ONNX_BYTES:
+            raise OSError('rembg ONNX model bytes exceed the supported size limit')
+        digest = hashlib.sha256(model_bytes).hexdigest()
+        expected = _EXPECTED.get('rembgWeights', {})
+        if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
+            raise OSError('rembg model-loader bytes do not match the pre-inference fingerprint')
+        result = original_init(instance, model_bytes, *args, **kwargs)
+        _append_receipt(
+            'onnxruntime.InferenceSession', digest, len(model_bytes), True
+        )
+        return result
+    raise OSError('rembg model loader received an unsupported input type')
+
+def _patch_module(name, module):
+    if not _RECEIPT or module is None or name in _PATCHED:
+        return
+    if name == 'torch' and callable(getattr(module, 'load', None)):
+        original = module.load
+        def tracked_load(file_value, *args, **kwargs):
+            return _tracked_file_loader('torch.load', original, file_value, args, kwargs)
+        module.load = tracked_load
+        _PATCHED.add(name)
+    elif name == 'omegaconf' and getattr(module, 'OmegaConf', None) is not None:
+        config_class = module.OmegaConf
+        original = getattr(config_class, 'load', None)
+        if callable(original):
+            def tracked_config_load(file_value, *args, **kwargs):
+                return _tracked_file_loader(
+                    'omegaconf.OmegaConf.load', original, file_value, args, kwargs
+                )
+            config_class.load = staticmethod(tracked_config_load)
+            _PATCHED.add(name)
+    elif name == 'onnxruntime' and isinstance(getattr(module, 'InferenceSession', None), type):
+        session_class = module.InferenceSession
+        original_init = getattr(session_class, '__init__', None)
+        if callable(original_init):
+            def tracked_inference_session_init(instance, model_path_or_bytes, *args, **kwargs):
+                return _tracked_onnx_session(
+                    original_init, instance, model_path_or_bytes, args, kwargs
+                )
+            session_class.__init__ = tracked_inference_session_init
+            _PATCHED.add(name)
+
+
+def _tracked_pil_image_open(original, fp, *args, **kwargs):
+    global _SOURCE_BYTES, _SOURCE_RECEIPT_WRITTEN
+    if not _SOURCE_EXPECTED_PATH or not _SOURCE_RECEIPT:
+        raise OSError('source-image attestation configuration is unavailable')
+    expected_bytes = _SOURCE_EXPECTED.get('bytes')
+    expected_sha256 = _SOURCE_EXPECTED.get('sha256')
+    if not isinstance(expected_bytes, int) or expected_bytes <= 0 or expected_bytes > _MAX_SOURCE_BYTES:
+        raise OSError('source image expected byte count is invalid')
+    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
+        raise OSError('source image expected SHA-256 is invalid')
+
+    candidate = fp if isinstance(fp, (str, bytes, os.PathLike)) else getattr(fp, 'name', None)
+    if isinstance(candidate, (str, bytes, os.PathLike)):
+        try:
+            candidate_path = os.path.realpath(os.fsdecode(candidate))
+        except Exception:
+            raise OSError('source image path cannot be resolved')
+        if candidate_path != _SOURCE_EXPECTED_PATH:
+            raise OSError('PIL.Image.open attempted to decode an image other than the attested source path')
+        if _SOURCE_BYTES is None:
+            with open(candidate_path, 'rb') as handle:
+                before = os.fstat(handle.fileno())
+                if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_SOURCE_BYTES:
+                    raise OSError('source image is not a supported regular file')
+                source_bytes = handle.read(_MAX_SOURCE_BYTES + 1)
+                after = os.fstat(handle.fileno())
+                try:
+                    path_after = os.stat(candidate_path)
+                except Exception:
+                    raise OSError('source image path changed during capture')
+                stable = (
+                    _signature(before) == _signature(after) == _signature(path_after)
+                    and len(source_bytes) == after.st_size
+                    and len(source_bytes) <= _MAX_SOURCE_BYTES
+                )
+            if not stable:
+                raise OSError('source image changed while its bytes were captured')
+            digest = hashlib.sha256(source_bytes).hexdigest()
+            if len(source_bytes) != expected_bytes or digest != expected_sha256:
+                raise OSError('source image decoder input does not match the pre-inference source fingerprint')
+            _SOURCE_BYTES = source_bytes
+    else:
+        raise OSError('PIL.Image.open received an unsupported source-image input type')
+
+    digest = hashlib.sha256(_SOURCE_BYTES).hexdigest()
+    if len(_SOURCE_BYTES) != expected_bytes or digest != expected_sha256:
+        raise OSError('cached source image bytes no longer match the pre-inference source fingerprint')
+    result = original(io.BytesIO(_SOURCE_BYTES), *args, **kwargs)
+    try:
+        result.filename = _SOURCE_EXPECTED_PATH
+    except Exception:
+        pass
+    if not _SOURCE_RECEIPT_WRITTEN:
+        event = {
+            'schemaVersion': '1.0.0',
+            'role': 'sourceImage',
+            'loader': 'PIL.Image.open',
+            'bytes': len(_SOURCE_BYTES),
+            'sha256': digest,
+            'exactBytesPassed': True,
+            'stable': True,
+        }
+        payload = (json.dumps(event, sort_keys=True, separators=(',', ':')) + '\n').encode('utf-8')
+        flags = os.O_WRONLY | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0)
+        descriptor = os.open(_SOURCE_RECEIPT, flags)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError('source-image receipt is not a regular file')
+            written = 0
+            while written < len(payload):
+                written += os.write(descriptor, payload[written:])
+        finally:
+            os.close(descriptor)
+        _SOURCE_RECEIPT_WRITTEN = True
+    return result
+
+def _patch_pil_image(module):
+    if module is None or 'PIL.Image' in _PATCHED:
+        return
+    original = getattr(module, 'open', None)
+    if callable(original):
+        def tracked_image_open(fp, *args, **kwargs):
+            return _tracked_pil_image_open(original, fp, *args, **kwargs)
+        module.open = tracked_image_open
+        _PATCHED.add('PIL.Image')
+
+
+_original_import = builtins.__import__
+_original_import_module = importlib.import_module
+def _import_with_model_load_tracking(name, globals=None, locals=None, fromlist=(), level=0):
+    imported = _original_import(name, globals, locals, fromlist, level)
+    module_name = name.split('.', 1)[0]
+    _patch_module(module_name, sys.modules.get(module_name))
+    _patch_pil_image(sys.modules.get('PIL.Image'))
+    return imported
+
+def _import_module_with_model_load_tracking(name, package=None):
+    imported = _original_import_module(name, package)
+    module_name = name.split('.', 1)[0]
+    _patch_module(module_name, sys.modules.get(module_name))
+    _patch_pil_image(sys.modules.get('PIL.Image'))
+    return imported
+
+if _RECEIPT or _SOURCE_RECEIPT:
+    builtins.__import__ = _import_with_model_load_tracking
+    importlib.import_module = _import_module_with_model_load_tracking
+`;
+const OFFLINE_SITE_CUSTOMIZE = SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE;
 
 function safeId(value, label, maxLength = 80) {
   if (typeof value !== "string" || !SAFE_ID.test(value) || value.length > maxLength) {
@@ -158,6 +469,7 @@ async function requireFreshSmokeIdentities(root, buildingId, jobId, sourceId) {
     [".building-engine/jobs/" + buildingId + "/" + jobId, "Smoke job artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow", "Smoke workflow artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + workerJobId + "-single-view", "TripoSR single-view artifact directory"],
+    [".building-engine/runtime-smokes/" + jobId + ".artifact.json", "Generation artifact receipt"],
   ];
   for (const [relativePath, label] of paths) {
     await assertArtifactPathAbsent(root, relativePath, label);
@@ -274,11 +586,70 @@ function qualitySummary(modelQuality) {
   };
 }
 
+async function captureWorkflowReportEvidence({ workspaceRoot, workflow, workflowReport, buildingId, jobId }) {
+  if (typeof workflow?.reportPath !== "string" || !workflow.reportPath.trim()) {
+    throw new TypeError("Media-to-model workflow did not return its on-disk generation report path.");
+  }
+  const expectedRelativePath = ".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow/workflow-report.json";
+  const candidate = path.resolve(workflow.reportPath);
+  if (!inside(workspaceRoot, candidate)) {
+    throw new TypeError("Media-to-model workflow report path escapes workspaceRoot.");
+  }
+  const relativePath = path.relative(workspaceRoot, candidate).split(path.sep).join("/");
+  if (relativePath !== expectedRelativePath) {
+    throw new TypeError("Media-to-model workflow report path does not match the exact smoke job.");
+  }
+  let current = workspaceRoot;
+  const segments = relativePath.split("/");
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const entry = await lstat(current);
+    if (entry.isSymbolicLink()) {
+      throw new TypeError("Media-to-model workflow report must not contain symlink path components.");
+    }
+    const final = index === segments.length - 1;
+    if (!final && !entry.isDirectory()) {
+      throw new TypeError("Media-to-model workflow report path contains a non-directory component.");
+    }
+    if (final && !entry.isFile()) {
+      throw new TypeError("Media-to-model workflow report must be a regular file.");
+    }
+    const actual = await realpath(current);
+    if (!inside(workspaceRoot, actual)) {
+      throw new TypeError("Media-to-model workflow report resolves outside workspaceRoot.");
+    }
+    if (final) current = actual;
+  }
+  const info = await stat(current);
+  if (!info.size || info.size > 1024 * 1024) {
+    throw new RangeError("Media-to-model workflow report is empty or exceeds 1 MiB.");
+  }
+  const bytes = await readFile(current);
+  const onDiskReport = JSON.parse(bytes.toString("utf8"));
+  if (canonicalJson(onDiskReport) !== canonicalJson(workflowReport)) {
+    throw new TypeError("On-disk media-to-model workflow report differs from the returned generation report.");
+  }
+  if (onDiskReport.jobId !== jobId || onDiskReport.buildingId !== buildingId ||
+      onDiskReport.status !== "completed-requires-review" || onDiskReport.mode !== "single-image-ai" ||
+      onDiskReport.mapReady !== false || onDiskReport.publicationEligible !== false) {
+    throw new TypeError("On-disk generation workflow report identity or fail-closed status is invalid.");
+  }
+  return {
+    path: relativePath,
+    bytes: bytes.length,
+    sha256: digest(bytes),
+    status: onDiskReport.status,
+    mode: onDiskReport.mode,
+  };
+}
+
 function offlineSpawn(spawnImpl, offlinePythonDirectory, {
   pythonPath,
   runnerScript,
   onRunnerLaunchAttempt,
   onRunnerProcessStarted,
+  modelLoadAttestation,
+  sourceImageAttestation,
 } = {}) {
   return (executable, args, options = {}) => {
     const isRunnerInvocation = executable === pythonPath &&
@@ -298,6 +669,37 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
           process.env.PYTHONPATH,
         ].filter(Boolean).join(path.delimiter),
         ...OFFLINE_ENV,
+        ...(isRunnerInvocation && modelLoadAttestation?.expectedArtifacts ? {
+          BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH: modelLoadAttestation.receiptPath,
+          BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON: JSON.stringify({
+            tripoConfig: {
+              bytes: modelLoadAttestation.expectedArtifacts.tripoConfig.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.tripoConfig.sha256,
+            },
+            tripoCheckpoint: {
+              bytes: modelLoadAttestation.expectedArtifacts.tripoCheckpoint.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.tripoCheckpoint.sha256,
+            },
+            rembgWeights: {
+              bytes: modelLoadAttestation.expectedArtifacts.rembgWeights.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.rembgWeights.sha256,
+            },
+          }),
+        } : {}),
+        ...(isRunnerInvocation && sourceImageAttestation ? (() => {
+          const sourceArgument = args[1];
+          if (typeof sourceArgument !== "string" || !sourceArgument.trim()) {
+            throw new TypeError("TripoSR runner invocation is missing its exact source-image path argument.");
+          }
+          return {
+            BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH: sourceImageAttestation.receiptPath,
+            BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH: path.resolve(sourceArgument),
+            BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON: JSON.stringify({
+              bytes: sourceImageAttestation.bytes,
+              sha256: sourceImageAttestation.sha256,
+            }),
+          };
+        })() : {}),
       },
     });
     if (isRunnerInvocation && typeof child?.once === "function") {
@@ -307,22 +709,189 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
   };
 }
 
-function readinessBlockers(capabilities) {
-  const entry = capabilities?.strategies?.["single-image-ai"];
-  if (entry?.status === "ready" &&
-      entry.modelWeights === "cached" &&
-      entry.backgroundRemovalWeights === "cached") return [];
-  const blockers = Array.isArray(entry?.blockers)
-    ? entry.blockers.filter((item) => typeof item === "string").slice(0, 8)
+function workerFingerprintSnapshot(inventory) {
+  const artifacts = inventory?.modelArtifacts ?? {};
+  const artifact = (value, includeRevision = false) => ({
+    status: value?.status ?? "unknown",
+    bytes: Number.isSafeInteger(value?.bytes) && value.bytes > 0 ? value.bytes : null,
+    sha256: typeof value?.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+      ? value.sha256 : null,
+    ...(includeRevision ? {
+      snapshotRevision: typeof value?.snapshotRevision === "string" &&
+        /^[a-f0-9]{40}$/.test(value.snapshotRevision) ? value.snapshotRevision : null,
+    } : {}),
+  });
+  return {
+    checkedAt: typeof inventory?.checkedAt === "string" ? inventory.checkedAt : null,
+    runner: {
+      bytes: Number.isSafeInteger(inventory?.runner?.bytes) && inventory.runner.bytes > 0
+        ? inventory.runner.bytes : null,
+      sha256: typeof inventory?.runner?.sha256 === "string" &&
+        /^[a-f0-9]{64}$/.test(inventory.runner.sha256) ? inventory.runner.sha256 : null,
+    },
+    backgroundRemovalModel: typeof inventory?.modelReadiness?.backgroundRemovalModel === "string" &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(inventory.modelReadiness.backgroundRemovalModel)
+      ? inventory.modelReadiness.backgroundRemovalModel : null,
+    modelArtifacts: {
+      tripoConfig: artifact(artifacts.tripoConfig, true),
+      tripoCheckpoint: artifact(artifacts.tripoCheckpoint, true),
+      rembgWeights: artifact(artifacts.rembgWeights),
+    },
+  };
+}
+
+function workerFingerprintBlockers(inventory) {
+  const blockers = Array.isArray(inventory?.blockers)
+    ? inventory.blockers.filter((item) => typeof item === "string").slice(0, 20)
     : [];
-  if (entry?.modelWeights !== "cached") {
-    blockers.push("TripoSR config.yaml/model.ckpt cache is not verified as cached.");
+  if (inventory?.status !== "ready-for-operator-smoke") {
+    blockers.push("worker-host-inventory-not-ready");
   }
-  if (entry?.backgroundRemovalWeights !== "cached") {
-    blockers.push("The installed rembg default-model cache is not verified as cached.");
+  if (inventory?.modelReadiness?.status !== "ready" ||
+      inventory?.modelReadiness?.tripoModelWeights !== "cached" ||
+      inventory?.modelReadiness?.backgroundRemovalWeights !== "cached") {
+    blockers.push("single-image-model-readiness-not-verified");
   }
-  if (!blockers.length) blockers.push("Single-image AI strategy readiness is not ready.");
-  return [...new Set(blockers)].slice(0, 8);
+  const snapshot = workerFingerprintSnapshot(inventory);
+  if (inventory?.runner?.status !== "present" || !snapshot.runner.bytes || !snapshot.runner.sha256) {
+    blockers.push("triposr-runner-fingerprint-incomplete");
+  }
+  const config = snapshot.modelArtifacts.tripoConfig;
+  const checkpoint = snapshot.modelArtifacts.tripoCheckpoint;
+  const rembg = snapshot.modelArtifacts.rembgWeights;
+  if (config.status !== "cached" || !config.bytes || !config.sha256 || !config.snapshotRevision) {
+    blockers.push("triposr-config-fingerprint-incomplete");
+  }
+  if (checkpoint.status !== "cached" || !checkpoint.bytes || !checkpoint.sha256 ||
+      !checkpoint.snapshotRevision || checkpoint.snapshotRevision !== config.snapshotRevision) {
+    blockers.push("triposr-checkpoint-fingerprint-incomplete");
+  }
+  if (rembg.status !== "cached" || !rembg.bytes || !rembg.sha256 ||
+      !snapshot.backgroundRemovalModel) {
+    blockers.push("rembg-weight-fingerprint-incomplete");
+  }
+  return [...new Set(blockers)].slice(0, 20);
+}
+
+
+async function readModelLoadEvidence(receiptPath, expectedSnapshot) {
+  const entry = await lstat(receiptPath);
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size <= 0 || entry.size > 64 * 1024) {
+    throw new TypeError("TripoSR/rembg model-load receipt is missing, unsafe or exceeds its size limit.");
+  }
+  if (process.platform !== "win32" && (entry.mode & 0o077) !== 0) {
+    throw new TypeError("TripoSR/rembg model-load receipt permissions are not private.");
+  }
+  const receiptText = await readFile(receiptPath, "utf8");
+  const events = receiptText.split(/\r?\n/).filter((line) => line.length > 0);
+  if (!events.length || events.length > 64) {
+    throw new TypeError("TripoSR/rembg model-load receipt has no events or too many events.");
+  }
+  const expected = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const loaders = {};
+  for (const [role, loader] of expected) {
+    const artifact = expectedSnapshot?.modelArtifacts?.[role];
+    if (!Number.isSafeInteger(artifact?.bytes) || artifact.bytes <= 0 ||
+        !/^[a-f0-9]{64}$/.test(artifact?.sha256 ?? "")) {
+      throw new TypeError("Pre-inference worker model fingerprint is incomplete for " + role + ".");
+    }
+    const matchingEvents = [];
+    for (const line of events) {
+      let event;
+      try { event = JSON.parse(line); } catch {
+        throw new TypeError("TripoSR/rembg model-load receipt contains malformed JSON.");
+      }
+      const keys = Object.keys(event ?? {}).sort();
+      if (JSON.stringify(keys) !== JSON.stringify([
+        "bytes", "exactBytesPassed", "loader", "role", "schemaVersion", "sha256", "stable",
+      ].sort())) {
+        throw new TypeError("TripoSR/rembg model-load receipt contains unexpected or path-bearing fields.");
+      }
+      if (event.schemaVersion !== "1.0.0" ||
+          !["tripoConfig", "tripoCheckpoint", "rembgWeights"].includes(event.role) ||
+          !["omegaconf.OmegaConf.load", "torch.load", "onnxruntime.InferenceSession"].includes(event.loader) ||
+          !Number.isSafeInteger(event.bytes) || event.bytes <= 0 ||
+          !/^[a-f0-9]{64}$/.test(event.sha256 ?? "") ||
+          event.exactBytesPassed !== true || event.stable !== true) {
+        throw new TypeError("TripoSR/rembg model-load receipt contains an invalid loader event.");
+      }
+      if (event.role === role) matchingEvents.push(event);
+    }
+    if (!matchingEvents.length || matchingEvents.some((event) =>
+      event.loader !== loader ||
+      event.bytes !== artifact.bytes ||
+      event.sha256 !== artifact.sha256
+    )) {
+      throw new TypeError("TripoSR/rembg model-load receipt does not bind " + role + " to the exact pre-inference bytes.");
+    }
+    loaders[role] = {
+      loader,
+      bytes: artifact.bytes,
+      sha256: artifact.sha256,
+      exactBytesPassed: true,
+      stable: true,
+    };
+  }
+  return {
+    schemaVersion: "1.0.0",
+    status: "verified",
+    loaders,
+  };
+}
+
+
+async function readSourceImageLoadEvidence(receiptPath, expectedSource) {
+  const entry = await lstat(receiptPath);
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size <= 0 || entry.size > 16 * 1024) {
+    throw new TypeError("TripoSR source-image loader receipt is missing, unsafe or exceeds its size limit.");
+  }
+  if (process.platform !== "win32" && (entry.mode & 0o077) !== 0) {
+    throw new TypeError("TripoSR source-image loader receipt permissions are not private.");
+  }
+  const lines = (await readFile(receiptPath, "utf8")).split(/\r?\n/).filter(Boolean);
+  if (lines.length !== 1) {
+    throw new TypeError("TripoSR source-image loader receipt must contain exactly one successful source event.");
+  }
+  let event;
+  try { event = JSON.parse(lines[0]); } catch {
+    throw new TypeError("TripoSR source-image loader receipt is malformed JSON.");
+  }
+  const keys = Object.keys(event ?? {}).sort();
+  if (JSON.stringify(keys) !== JSON.stringify([
+    "bytes", "exactBytesPassed", "loader", "role", "schemaVersion", "sha256", "stable",
+  ].sort())) {
+    throw new TypeError("TripoSR source-image loader receipt contains unexpected or path-bearing fields.");
+  }
+  if (event.schemaVersion !== "1.0.0" || event.role !== "sourceImage" ||
+      event.loader !== "PIL.Image.open" || !Number.isSafeInteger(event.bytes) ||
+      event.bytes <= 0 || !/^[a-f0-9]{64}$/.test(event.sha256 ?? "") ||
+      event.exactBytesPassed !== true || event.stable !== true ||
+      event.bytes !== expectedSource?.bytes || event.sha256 !== expectedSource?.sha256) {
+    throw new TypeError("TripoSR source-image loader receipt does not match the exact pre-inference source bytes.");
+  }
+  return {
+    schemaVersion: "1.0.0",
+    status: "verified",
+    loader: "PIL.Image.open",
+    bytes: event.bytes,
+    sha256: event.sha256,
+    exactBytesPassed: true,
+    stable: true,
+    eventCount: 1,
+  };
+}
+
+
+function workerFingerprintValues(snapshot) {
+  return JSON.stringify({
+    runner: snapshot?.runner ?? null,
+    backgroundRemovalModel: snapshot?.backgroundRemovalModel ?? null,
+    modelArtifacts: snapshot?.modelArtifacts ?? null,
+  });
 }
 
 /**
@@ -374,6 +943,10 @@ export async function runSingleImageRuntimeSmoke(options) {
     throw new RangeError("mcResolution must be an integer from 64 to 512.");
   }
   const timeoutMs = options.timeoutMs ?? 1_800_000;
+  const inventoryTimeoutMs = options.inventoryTimeoutMs ?? 180_000;
+  if (!Number.isInteger(inventoryTimeoutMs) || inventoryTimeoutMs < 1_000 || inventoryTimeoutMs > 180_000) {
+    throw new RangeError("inventoryTimeoutMs must be an integer from 1000 to 180000.");
+  }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 10_000 || timeoutMs > 7_200_000) {
     throw new RangeError("timeoutMs must be an integer from 10000 to 7200000.");
   }
@@ -383,6 +956,30 @@ export async function runSingleImageRuntimeSmoke(options) {
   const buildingId = safeId(buildingSpec.id, "buildingSpec.id");
   await requireFreshSmokeIdentities(workspaceRoot, buildingId, jobId, sourceId);
   const source = await inspectSource(workspaceRoot, relativePath);
+  const controlPointManifestPath = options.controlPointManifestPath === undefined
+    ? null
+    : safeRelativePath(options.controlPointManifestPath, "controlPointManifestPath");
+  const maxGcpRmsErrorM = options.maxGcpRmsErrorM ?? 0.5;
+  const maxGcpResidualM = options.maxGcpResidualM ?? 1.0;
+  const maxVerticalGcpRmsErrorM = options.maxVerticalGcpRmsErrorM ?? 0.5;
+  const maxVerticalGcpResidualM = options.maxVerticalGcpResidualM ?? 1.0;
+  for (const [label, value] of [
+    ["maxGcpRmsErrorM", maxGcpRmsErrorM], ["maxGcpResidualM", maxGcpResidualM],
+    ["maxVerticalGcpRmsErrorM", maxVerticalGcpRmsErrorM], ["maxVerticalGcpResidualM", maxVerticalGcpResidualM],
+  ]) {
+    if (!Number.isFinite(value) || value <= 0 || value > 100) {
+      throw new RangeError(label + " must be a finite value in (0,100].");
+    }
+  }
+  const controlPointManifestBefore = controlPointManifestPath
+    ? await loadSingleImageControlPointManifest({
+      workspaceRoot,
+      relativePath: controlPointManifestPath,
+      buildingId,
+      sourceId,
+      sourceSha256: source.sha256,
+    })
+    : null;
   const pythonPath = options.pythonPath ||
     process.env.BUILDING_ENGINE_PYTHON_EXECUTABLE ||
     process.env.TRIPOSR_PYTHON ||
@@ -417,6 +1014,16 @@ export async function runSingleImageRuntimeSmoke(options) {
       backgroundRemovalWeights: "not-checked",
       backgroundRemovalModel: null,
     },
+    workerHost: {
+      inventorySchemaVersion: null,
+      before: null,
+      after: null,
+      stableAcrossInference: null,
+    },
+    modelLoadEvidence: null,
+    sourceLoadEvidence: null,
+    generationArtifactReceipt: null,
+    georeferenceEvidence: null,
     source: {
       sourceId,
       relativePath: relativePath,
@@ -460,11 +1067,23 @@ export async function runSingleImageRuntimeSmoke(options) {
     },
   };
   const offlinePythonDirectory = await mkdtemp(path.join(os.tmpdir(), "single-image-offline-"));
+  const modelLoadReceiptPath = path.join(offlinePythonDirectory, "model-load-receipt.jsonl");
+  const sourceImageReceiptPath = path.join(offlinePythonDirectory, "source-image-load-receipt.jsonl");
+  const modelLoadAttestation = { receiptPath: modelLoadReceiptPath, expectedArtifacts: null };
+  const sourceImageAttestation = {
+    receiptPath: sourceImageReceiptPath,
+    bytes: source.bytes,
+    sha256: source.sha256,
+  };
   try {
     await writeFile(path.join(offlinePythonDirectory, "sitecustomize.py"), OFFLINE_SITE_CUSTOMIZE, {
       flag: "wx",
       mode: 0o600,
     });
+    await writeFile(modelLoadReceiptPath, "", { flag: "wx", mode: 0o600 });
+    await chmod(modelLoadReceiptPath, 0o600);
+    await writeFile(sourceImageReceiptPath, "", { flag: "wx", mode: 0o600 });
+    await chmod(sourceImageReceiptPath, 0o600);
     await createInitialReport(reportPath, report);
   } catch (error) {
     await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
@@ -476,6 +1095,8 @@ export async function runSingleImageRuntimeSmoke(options) {
   const spawnOffline = offlineSpawn(spawnImpl, offlinePythonDirectory, {
     pythonPath,
     runnerScript,
+    modelLoadAttestation,
+    sourceImageAttestation,
     onRunnerLaunchAttempt: () => {
       runnerLaunchAttempted = true;
     },
@@ -484,22 +1105,38 @@ export async function runSingleImageRuntimeSmoke(options) {
     },
   });
   try {
-    const capabilities = await (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
+    const collectInventory = options.collectWorkerHostInventory ?? collectGenerationWorkerHostInventory;
+    const collectWorkerSnapshot = async () => collectInventory({
       env,
-      spawnImpl: spawnOffline,
-      now: checkedAt,
-      commandTimeoutMs: options.commandTimeoutMs ?? 10_000,
-      strategies: ["single-image-ai"],
+      pythonPath,
+      runnerScript,
+      device,
+      now: new Date().toISOString(),
+      commandTimeoutMs: inventoryTimeoutMs,
+      probeCapabilities: (probeOptions) =>
+        (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
+          ...probeOptions,
+          spawnImpl: spawnOffline,
+        }),
+      ...(options.inventorySpawnSyncImpl ? { spawnSyncImpl: options.inventorySpawnSyncImpl } : {}),
     });
-    report.checkedAt = capabilities?.checkedAt ?? checkedAt;
-    const blockers = readinessBlockers(capabilities);
-    const singleImage = capabilities?.strategies?.["single-image-ai"];
+    const inventoryBefore = await collectWorkerSnapshot();
+    const beforeSnapshot = workerFingerprintSnapshot(inventoryBefore);
+    const blockers = workerFingerprintBlockers(inventoryBefore);
+    report.checkedAt = inventoryBefore?.checkedAt ?? checkedAt;
+    report.workerHost = {
+      inventorySchemaVersion: inventoryBefore?.schemaVersion ?? null,
+      before: beforeSnapshot,
+      after: null,
+      stableAcrossInference: null,
+    };
+    modelLoadAttestation.expectedArtifacts = beforeSnapshot.modelArtifacts;
     report.readiness = {
       strategy: "single-image-ai",
       status: blockers.length ? "blocked" : "ready",
-      tripoModelWeights: singleImage?.modelWeights ?? "unknown",
-      backgroundRemovalWeights: singleImage?.backgroundRemovalWeights ?? "unknown",
-      backgroundRemovalModel: singleImage?.backgroundRemovalModel ?? null,
+      tripoModelWeights: inventoryBefore?.modelReadiness?.tripoModelWeights ?? "unknown",
+      backgroundRemovalWeights: inventoryBefore?.modelReadiness?.backgroundRemovalWeights ?? "unknown",
+      backgroundRemovalModel: inventoryBefore?.modelReadiness?.backgroundRemovalModel ?? null,
       blockers,
     };
     await replaceReportAtomically(reportPath, report);
@@ -535,11 +1172,19 @@ export async function runSingleImageRuntimeSmoke(options) {
       pretrainedModelNameOrPath: MODEL_ID,
       singleImageTimeoutMs: timeoutMs,
       spawnImpl: spawnOffline,
+      ...(controlPointManifestBefore ? {
+        controlPoints: controlPointManifestBefore.manifest.controlPoints,
+        maxGcpRmsErrorM,
+        maxGcpResidualM,
+      } : {}),
     });
 
     if (!runnerProcessStarted) {
       throw new TypeError("TripoSR runner did not emit a process-spawn event; runtime inference cannot be confirmed.");
     }
+    report.modelLoadEvidence = await readModelLoadEvidence(modelLoadReceiptPath, beforeSnapshot);
+    report.sourceLoadEvidence = await readSourceImageLoadEvidence(sourceImageReceiptPath, source);
+    await replaceReportAtomically(reportPath, report);
 
     const workflowReport = workflow?.report;
     if (!workflowReport || workflowReport.jobId !== jobId ||
@@ -549,9 +1194,17 @@ export async function runSingleImageRuntimeSmoke(options) {
         workflowReport.mapReady !== false ||
         workflowReport.publicationEligible !== false ||
         !workflowReport.output?.modelPath ||
-        !/^[a-f0-9]{64}$/.test(workflowReport.output.modelSha256 ?? "")) {
+        !/^[a-f0-9]{64}$/.test(workflowReport.output.modelSha256 ?? "") ||
+        !workflow.reportPath) {
       throw new TypeError("Media-to-model workflow did not return a complete fail-closed single-image candidate report.");
     }
+    const workflowReportEvidence = await captureWorkflowReportEvidence({
+      workspaceRoot,
+      workflow,
+      workflowReport,
+      buildingId,
+      jobId,
+    });
     if (!Array.isArray(workflowReport.inputs?.selectedViewIds) ||
         workflowReport.inputs.selectedViewIds.length !== 1 ||
         workflowReport.inputs.selectedViewIds[0] !== sourceId) {
@@ -603,6 +1256,59 @@ export async function runSingleImageRuntimeSmoke(options) {
       throw new TypeError("TripoSR and workflow GLB SHA-256 values do not match.");
     }
 
+    const controlPointManifestAfter = controlPointManifestPath
+      ? await loadSingleImageControlPointManifest({
+        workspaceRoot,
+        relativePath: controlPointManifestPath,
+        buildingId,
+        sourceId,
+        sourceSha256: source.sha256,
+      })
+      : null;
+    if (controlPointManifestBefore &&
+        (controlPointManifestAfter.bytes !== controlPointManifestBefore.bytes ||
+         controlPointManifestAfter.sha256 !== controlPointManifestBefore.sha256)) {
+      throw new Error("Control-point manifest changed during single-image generation.");
+    }
+    const georeferenceEvidence = createSingleImageGeoreferenceEvidence({
+      loadedManifest: controlPointManifestAfter,
+      modelSha256,
+      ...(controlPointManifestAfter ? {
+        maxGcpRmsErrorM, maxGcpResidualM, maxVerticalGcpRmsErrorM, maxVerticalGcpResidualM,
+      } : {}),
+    });
+    if (controlPointManifestAfter) {
+      if (canonicalJson(workflowReport.georeference) !== canonicalJson(georeferenceEvidence.registration)) {
+        throw new TypeError("Media-to-model workflow georeference does not match the supplied control-point manifest.");
+      }
+    } else if (workflowReport.georeference !== undefined) {
+      throw new TypeError("Workflow report contains an unrequested ground-control registration.");
+    }
+    report.georeferenceEvidence = georeferenceEvidence;
+    if (controlPointManifestAfter?.manifest.vertical &&
+        georeferenceEvidence.verticalEvidence?.status !== "calibrated-needs-human-review") {
+      throw new Error("Vertical ellipsoidal-height control residuals did not pass; the candidate remains failed and unpublished.");
+    }
+    if (controlPointManifestAfter?.manifest.heldOutCheckpoints &&
+        georeferenceEvidence.independentCheckpointEvidence?.status !== "validated-needs-human-review") {
+      throw new Error("Independent held-out 3D checkpoint validation did not pass; the candidate remains failed and unpublished.");
+    }
+
+    const inventoryAfter = await collectWorkerSnapshot();
+    const afterSnapshot = workerFingerprintSnapshot(inventoryAfter);
+    const afterBlockers = workerFingerprintBlockers(inventoryAfter);
+    const fingerprintsStable = afterBlockers.length === 0 &&
+      workerFingerprintValues(beforeSnapshot) === workerFingerprintValues(afterSnapshot);
+    report.workerHost.after = afterSnapshot;
+    report.workerHost.stableAcrossInference = fingerprintsStable;
+    await replaceReportAtomically(reportPath, report);
+    if (afterBlockers.length) {
+      throw new TypeError("Worker host post-inference model artifact fingerprint verification is blocked.");
+    }
+    if (!fingerprintsStable) {
+      throw new TypeError("Worker model artifacts or TripoSR runner fingerprint changed during inference.");
+    }
+
     report.status = "passed";
     report.completedAt = new Date().toISOString();
     report.inference = {
@@ -618,6 +1324,46 @@ export async function runSingleImageRuntimeSmoke(options) {
       meshCount: glb.meshCount,
     };
     report.geometryQa = qualitySummary(modelReport.modelQuality);
+    const receiptPayload = {
+      schemaVersion: "1.2.0",
+      kind: "single-image-generation-artifact",
+      buildingId,
+      jobId,
+      workflowReport: workflowReportEvidence,
+      source: {
+        sourceId: report.source.sourceId,
+        mimeType: report.source.mimeType,
+        bytes: report.source.bytes,
+        sha256: report.source.sha256,
+        loaderEvidence: report.sourceLoadEvidence,
+      },
+      workerHost: {
+        inventorySchemaVersion: report.workerHost.inventorySchemaVersion,
+        stableAcrossInference: report.workerHost.stableAcrossInference,
+        before: report.workerHost.before,
+        after: report.workerHost.after,
+      },
+      modelLoadEvidence: report.modelLoadEvidence,
+      output: {
+        path: report.output.relativePath,
+        format: "glb",
+        bytes: report.output.bytes,
+        sha256: report.output.sha256,
+        meshCount: report.output.meshCount,
+      },
+      geometryQa: {
+        schemaVersion: "1.0.0",
+        engine: "glb-geometry-qa-v2",
+        ...report.geometryQa,
+      },
+      georeference: report.georeferenceEvidence,
+    };
+    report.generationArtifactReceipt = await writeGenerationArtifactReceipt({
+      workspaceRoot,
+      jobId,
+      buildingId,
+      payload: receiptPayload,
+    });
     report.candidateDisposition = "ai-proposed-requires-human-review";
     report.scaleCalibration = modelReport.scaleCalibration?.status ?? "not-calibrated";
     report.georeference = modelReport.georeference?.status ?? "not-solved";
@@ -627,7 +1373,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     await replaceReportAtomically(reportPath, report);
     return { report, reportPath, exitCode: 0 };
   } catch (error) {
-    if (!workflowStarted) report.readiness.blockers = ["single-image-readiness-probe-failed"];
+    if (!workflowStarted && !report.readiness.blockers?.length) report.readiness.blockers = ["single-image-readiness-probe-failed"];
     report.status = workflowStarted ? "failed" : "blocked";
     report.completedAt = new Date().toISOString();
     report.inference = {
@@ -640,7 +1386,11 @@ export async function runSingleImageRuntimeSmoke(options) {
       code: error instanceof Error && SAFE_ID.test(error.name) ? error.name : "RuntimeSmokeError",
       summary: !workflowStarted
         ? "Readiness probe failed; no inference was started."
-        : runnerProcessStarted
+        : error?.message === "Worker model artifacts or TripoSR runner fingerprint changed during inference."
+          ? "Worker model artifacts or TripoSR runner fingerprint changed during inference; the candidate remains failed and unpublished."
+          : error?.message === "Worker host post-inference model artifact fingerprint verification is blocked."
+            ? "Post-inference worker model artifact fingerprint verification was blocked; the candidate remains failed and unpublished."
+            : runnerProcessStarted
           ? "The TripoSR runner process started, but model generation, GLB export or evidence validation failed; inspect the private workflow report for diagnostics."
           : runnerLaunchAttempted
             ? "The workflow attempted to launch TripoSR, but the operating-system process never started; inference was not started."

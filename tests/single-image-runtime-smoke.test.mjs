@@ -11,6 +11,7 @@ import test from "node:test";
 import { runSingleImageRuntimeSmoke } from "../src/core/building-generation/single-image-runtime-smoke.mjs";
 import { verifySingleImageRuntimeSmoke } from "../src/core/building-generation/verify-single-image-runtime-smoke.mjs";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
+import { registerModelToWgs84 } from "../src/core/building-generation/ground-control-registration.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 
@@ -66,10 +67,78 @@ async function workspace(t) {
   return root;
 }
 
-async function startFakeRunner(options) {
-  const child = options.spawnImpl(
+async function writeFakeModelLoadReceipt(spawnOptions = {}) {
+  const env = spawnOptions.env ?? {};
+  const receiptPath = env.BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH;
+  const expected = env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON
+    ? JSON.parse(env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON)
+    : null;
+  if (!receiptPath || !expected) return;
+  const omittedRole = env.BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE ?? null;
+  const loaders = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const events = loaders
+    .filter(([role]) => role !== omittedRole)
+    .map(([role, loader]) => JSON.stringify({
+      schemaVersion: "1.0.0",
+      role,
+      loader,
+      bytes: expected[role].bytes,
+      sha256: expected[role].sha256,
+      exactBytesPassed: true,
+      stable: true,
+    }));
+  await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
+}
+
+
+async function writeFakeSourceImageLoadReceipt(spawnOptions = {}, args = []) {
+  const env = spawnOptions.env ?? {};
+  const receiptPath = env.BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH;
+  const expected = env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON
+    ? JSON.parse(env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON)
+    : null;
+  if (!receiptPath || !expected || env.BUILDING_ENGINE_TEST_OMIT_SOURCE_IMAGE_RECEIPT === "1") return;
+  const sourceArgument = args[1];
+  if (typeof sourceArgument !== "string" ||
+      path.resolve(sourceArgument) !== path.resolve(env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH ?? "")) {
+    throw new TypeError("Fake TripoSR source argument does not match the private source-image attestation path.");
+  }
+  await writeFile(receiptPath, JSON.stringify({
+    schemaVersion: "1.0.0",
+    role: "sourceImage",
+    loader: "PIL.Image.open",
+    bytes: expected.bytes,
+    sha256: expected.sha256,
+    exactBytesPassed: true,
+    stable: true,
+  }) + "\n");
+}
+
+async function startFakeRunner(options, {
+  omitModelLoadRole = null,
+  omitSourceImageReceipt = false,
+} = {}) {
+  const spawnImpl = omitModelLoadRole || omitSourceImageReceipt
+    ? (executable, args, spawnOptions = {}) => options.spawnImpl(executable, args, {
+      ...spawnOptions,
+      env: {
+        ...(spawnOptions.env ?? {}),
+        ...(omitModelLoadRole ? { BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE: omitModelLoadRole } : {}),
+        ...(omitSourceImageReceipt ? { BUILDING_ENGINE_TEST_OMIT_SOURCE_IMAGE_RECEIPT: "1" } : {}),
+      },
+    })
+    : options.spawnImpl;
+  const sourcePath = path.resolve(
+    options.workspaceRoot,
+    ...options.sources[0].relativePath.split("/"),
+  );
+  const child = spawnImpl(
     options.pythonPath,
-    [options.runnerScript, "--fixture-smoke"],
+    [options.runnerScript, sourcePath, "--fixture-smoke"],
     {},
   );
   if (!child || typeof child.once !== "function") {
@@ -105,7 +174,10 @@ function readyCapabilities() {
   };
 }
 
-async function fakeWorkflowResult(options, root, source) {
+async function fakeWorkflowResult(options, root, source, {
+  omitModelLoadRole = null,
+  omitSourceImageReceipt = false,
+} = {}) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmSingleViewInference, true);
@@ -117,7 +189,7 @@ async function fakeWorkflowResult(options, root, source) {
     "single-image-ai-reconstruction",
   ]);
 
-  await startFakeRunner(options);
+  await startFakeRunner(options, { omitModelLoadRole, omitSourceImageReceipt });
 
   const glb = makeGlb();
   const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
@@ -126,11 +198,8 @@ async function fakeWorkflowResult(options, root, source) {
   await writeFile(absoluteModelPath, glb);
 
   const outputHash = hash(glb);
-  return {
-    workflowDir: path.dirname(absoluteModelPath),
-    modelPath: absoluteModelPath,
-    reportPath: path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow", "workflow-report.json"),
-    report: {
+  const reportPath = path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow", "workflow-report.json");
+  const report = {
       jobId: "smoke-job",
       buildingId: fixture.id,
       status: "completed-requires-review",
@@ -170,14 +239,83 @@ async function fakeWorkflowResult(options, root, source) {
       },
       mapReady: false,
       publicationEligible: false,
+      warnings: [],
+  };
+  if (Array.isArray(options.controlPoints)) {
+    report.georeference = registerModelToWgs84({
+      controlPoints: options.controlPoints,
+      maxRmsErrorM: options.maxGcpRmsErrorM,
+      maxResidualM: options.maxGcpResidualM,
+    });
+  }
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
+  return {
+    workflowDir: path.dirname(absoluteModelPath),
+    modelPath: absoluteModelPath,
+    reportPath,
+    report,
+  };
+}
+
+
+async function fakeWorkerHostInventory({ env, now, commandTimeoutMs, probeCapabilities }) {
+  const capabilities = await probeCapabilities({
+    env,
+    now,
+    commandTimeoutMs,
+    strategies: ["single-image-ai"],
+  });
+  const entry = capabilities?.strategies?.["single-image-ai"] ?? {};
+  const ready = entry.status === "ready" &&
+    entry.modelWeights === "cached" &&
+    entry.backgroundRemovalWeights === "cached" &&
+    typeof entry.backgroundRemovalModel === "string";
+  return {
+    schemaVersion: "1.1.0",
+    kind: "generation-worker-host-inventory",
+    checkedAt: now,
+    status: ready ? "ready-for-operator-smoke" : "blocked",
+    runner: { status: "present", bytes: 128, sha256: hash(Buffer.from("fixture-triposr-runner")) },
+    modelArtifacts: {
+      tripoConfig: {
+        status: "cached", bytes: 512,
+        sha256: hash(Buffer.from("fixture-triposr-config")),
+        snapshotRevision: "a".repeat(40),
+      },
+      tripoCheckpoint: {
+        status: "cached", bytes: 480000000,
+        sha256: hash(Buffer.from("fixture-triposr-checkpoint")),
+        snapshotRevision: "a".repeat(40),
+      },
+      rembgWeights: {
+        status: "cached", bytes: 176000000,
+        sha256: hash(Buffer.from("fixture-rembg-weights")),
+      },
     },
+    runtimePackages: { torch: "2.5.1", onnxruntime: "1.20.1", rembg: "2.0.60" },
+    acceleration: { selectedDevice: "cpu" },
+    modelReadiness: {
+      status: ready ? "ready" : "blocked",
+      strategyStatus: entry.status ?? "unknown",
+      tripoModelWeights: entry.modelWeights ?? "unknown",
+      backgroundRemovalWeights: entry.backgroundRemovalWeights ?? "unknown",
+      backgroundRemovalModel: entry.backgroundRemovalModel ?? null,
+    },
+    blockers: ready ? [] : (entry.blockers ?? ["single-image-readiness-not-ready"]),
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
   };
 }
 
 function makeOptions(root, source, overrides = {}) {
-  const spawnImpl = overrides.spawnImpl ?? (() => {
+  const spawnImpl = overrides.spawnImpl ?? ((_executable, _args, spawnOptions = {}) => {
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(spawnOptions);
+      await writeFakeSourceImageLoadReceipt(spawnOptions, _args);
+      child.emit("spawn");
+    });
     return child;
   });
   return {
@@ -199,6 +337,7 @@ function makeOptions(root, source, overrides = {}) {
     confirmOperationScopes: true,
     confirmSingleViewInference: true,
     confirmModelLicences: true,
+    collectWorkerHostInventory: fakeWorkerHostInventory,
     probeCapabilities: async ({ env, spawnImpl, strategies }) => {
       assert.deepEqual(strategies, ["single-image-ai"]);
       assert.equal(env.HF_HUB_OFFLINE, "1");
@@ -245,7 +384,11 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     ].join("\n")], { env: options.env, encoding: "utf8", timeout: 5000 });
     assert.equal(offlineProbe.status, 0, offlineProbe.stderr || offlineProbe.stdout);
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(options);
+      await writeFakeSourceImageLoadReceipt(options, _args);
+      child.emit("spawn");
+    });
     return child;
   };
   let workflowCalls = 0;
@@ -261,10 +404,29 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
+  assert.equal(result.report.schemaVersion, "1.6.0");
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.2.0");
+  assert.equal(result.report.georeferenceEvidence.status, "not-requested");
+  assert.equal(result.report.georeferenceEvidence.registration, null);
+  assert.ok(result.report.generationArtifactReceipt.bytes > 0);
+  assert.match(result.report.generationArtifactReceipt.sha256, /^[a-f0-9]{64}$/);
+  assert.match(result.report.generationArtifactReceipt.payloadSha256, /^[a-f0-9]{64}$/);
   assert.equal(result.report.inference.runnerLaunchAttempted, true);
   assert.equal(result.report.inference.runnerProcessStarted, true);
   assert.equal(result.report.readiness.status, "ready");
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
+  assert.equal(result.report.workerHost.inventorySchemaVersion, "1.1.0");
+  assert.equal(result.report.workerHost.stableAcrossInference, true);
+  assert.equal(result.report.modelLoadEvidence.status, "verified");
+  assert.deepEqual(Object.keys(result.report.modelLoadEvidence.loaders).sort(), [
+    "rembgWeights", "tripoCheckpoint", "tripoConfig",
+  ]);
+  assert.equal(result.report.sourceLoadEvidence.status, "verified");
+  assert.equal(result.report.sourceLoadEvidence.loader, "PIL.Image.open");
+  assert.equal(result.report.sourceLoadEvidence.bytes, source.bytes.length);
+  assert.equal(result.report.sourceLoadEvidence.sha256, source.sha256);
+  assert.equal(result.report.sourceLoadEvidence.eventCount, 1);
+  assert.deepEqual(result.report.workerHost.before.modelArtifacts, result.report.workerHost.after.modelArtifacts);
   assert.equal(result.report.source.sha256, source.sha256);
   const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
   assert.equal(result.report.output.sha256, hash(await readFile(actualModelPath)));
@@ -307,8 +469,239 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.verified, true);
   assert.equal(verified.source.sha256, source.sha256);
   assert.equal(verified.model.sha256, result.report.output.sha256);
+  assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
+  assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
+  assert.equal(verified.sourceImageLoadEvidenceStatus, "verified-against-source-manifest");
+  assert.equal(verified.generationArtifactReceiptStatus, "verified");
+  assert.equal(verified.georeferenceEvidenceStatus, "not-requested");
+  assert.equal(verified.georeferenceEvidence.status, "not-requested");
+  assert.equal(verified.generationArtifactReceipt.sha256, result.report.generationArtifactReceipt.sha256);
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receiptBytes = await readFile(receiptPath);
+  const receiptStat = await stat(receiptPath);
+  if (process.platform !== "win32") assert.equal(receiptStat.mode & 0o777, 0o600);
+  const receiptEnvelope = JSON.parse(receiptBytes.toString("utf8"));
+  assert.equal(receiptEnvelope.payload.kind, "single-image-generation-artifact");
+  assert.equal(receiptEnvelope.payload.source.sha256, source.sha256);
+  assert.equal(receiptEnvelope.payload.output.sha256, result.report.output.sha256);
+  assert.equal(receiptEnvelope.payload.geometryQa.engine, "glb-geometry-qa-v2");
+  assert.equal(receiptEnvelope.payload.workerHost.stableAcrossInference, true);
+  assert.deepEqual(Object.keys(receiptEnvelope.payload.modelLoadEvidence.loaders).sort(), [
+    "rembgWeights", "tripoCheckpoint", "tripoConfig",
+  ]);
+  assert.equal(receiptEnvelope.payload.workflowReport.sha256, hash(await readFile(
+    path.join(root, ...receiptEnvelope.payload.workflowReport.path.split("/")),
+  )));
+  assert.equal(JSON.stringify(receiptEnvelope).includes(root), false);
+
+  const workflowReportPath = path.join(root, ...receiptEnvelope.payload.workflowReport.path.split("/"));
+  const workflowReportBytes = await readFile(workflowReportPath);
+  const tamperedWorkflowReport = JSON.parse(workflowReportBytes.toString("utf8"));
+  tamperedWorkflowReport.warnings.push("post-receipt tamper");
+  await writeFile(workflowReportPath, JSON.stringify(tamperedWorkflowReport, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /workflow report byte count or SHA-256/i,
+  );
+  await writeFile(workflowReportPath, workflowReportBytes);
+
+  await writeFile(receiptPath, Buffer.concat([receiptBytes, Buffer.from(" ")]));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /receipt byte count or SHA-256/i,
+  );
+  await writeFile(receiptPath, receiptBytes);
+
+  const legacyReport = { ...result.report, schemaVersion: "1.3.0" };
+  delete legacyReport.generationArtifactReceipt;
+  await writeFile(result.reportPath, JSON.stringify(legacyReport, null, 2) + "\n");
+  const legacyVerified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(legacyVerified.generationArtifactReceiptStatus, "not-recorded-legacy-schema");
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
+
+  const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedReport, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /fingerprints changed across inference/i,
+  );
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
+  const tamperedLoadEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedLoadEvidence.modelLoadEvidence.loaders.rembgWeights.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedLoadEvidence, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /model-load evidence does not match/i,
+  );
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
+  const tamperedSourceEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedSourceEvidence.sourceLoadEvidence.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedSourceEvidence, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /source-image load evidence does not match/i,
+  );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
+});
+
+
+
+test("binds optional control points through the single-image smoke, workflow report and artifact receipt", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  await mkdir(path.join(root, "survey"), { recursive: true });
+  const earthRadiusM = 6378137;
+  const baseLongitude = 90.4;
+  const baseLatitude = 23.7;
+  const controls = [[-10, -8], [10, -8], [10, 8], [-10, 8]].map(([modelX, modelZ], index) => ({
+    id: "gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    longitude: baseLongitude + (2 * modelX - modelZ + 100) /
+      (earthRadiusM * Math.cos(baseLatitude * Math.PI / 180)) * 180 / Math.PI,
+    latitude: baseLatitude + (modelX + 2 * modelZ + 200) /
+      earthRadiusM * 180 / Math.PI,
+    evidenceSourceId: "facade-photo",
+  }));
+  const manifest = {
+    schemaVersion: "1.0.0",
+    kind: "single-image-control-point-manifest",
+    buildingId: fixture.id,
+    source: { sourceId: "facade-photo", sha256: source.sha256 },
+    horizontalCrs: "EPSG:4326",
+    horizontalDatum: "WGS84",
+    verticalDatum: "not-provided",
+    survey: {
+      method: "RTK GNSS",
+      reference: "integration-fixture-2026-11-04",
+      observedAtUtc: "2026-11-04T10:00:00.000Z",
+      horizontalAccuracyM: 0.05,
+    },
+    controlPoints: controls,
+  };
+  const manifestPath = path.join(root, "survey", "controls.json");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    controlPointManifestPath: "survey/controls.json",
+    spawnImpl: (_executable, _args, options) => {
+      const child = new EventEmitter();
+      queueMicrotask(async () => {
+        await writeFakeModelLoadReceipt(options);
+        await writeFakeSourceImageLoadReceipt(options, _args);
+        child.emit("spawn");
+      });
+      return child;
+    },
+    runWorkflow: async (options) => {
+      assert.deepEqual(options.controlPoints, controls);
+      assert.equal(options.maxGcpRmsErrorM, 0.5);
+      assert.equal(options.maxGcpResidualM, 1);
+      return fakeWorkflowResult(options, root, source);
+    },
+  }));
+  assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
+  assert.equal(result.report.status, "passed");
+  assert.equal(result.report.georeferenceEvidence.status, "calibrated-needs-human-review");
+  assert.equal(result.report.georeferenceEvidence.modelSha256, result.report.output.sha256);
+  assert.equal(result.report.georeferenceEvidence.manifest.sha256, hash(await readFile(manifestPath)));
+  assert.equal(result.report.georeferenceEvidence.registration.vertical.status, "not-solved");
+  assert.equal(result.report.georeferenceEvidence.registration.mapReady, false);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+
+  const verified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(verified.verified, true);
+  assert.equal(verified.georeferenceEvidenceStatus, "calibrated-needs-human-review");
+  assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  assert.equal(receipt.schemaVersion, "1.2.0");
+  assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
+});
+
+test("fails closed when the runner does not attest the rembg model loader input", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) =>
+      fakeWorkflowResult(options, root, source, { omitModelLoadRole: "rembgWeights" }),
+  }));
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.summary, /model generation|evidence validation/i);
+  assert.equal(result.report.modelLoadEvidence, null);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+});
+
+
+test("fails closed when TripoSR does not attest the exact source image opened by Pillow", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) =>
+      fakeWorkflowResult(options, root, source, { omitSourceImageReceipt: true }),
+  }));
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.summary, /model generation|evidence validation/i);
+  assert.equal(result.report.sourceLoadEvidence, null);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+});
+
+test("blocks before inference when a cached worker model lacks an exact SHA-256", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  let workflowCalls = 0;
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    collectWorkerHostInventory: async (options) => {
+      const inventory = await fakeWorkerHostInventory(options);
+      inventory.modelArtifacts.rembgWeights.sha256 = null;
+      return inventory;
+    },
+    runWorkflow: async () => {
+      workflowCalls += 1;
+      throw new Error("workflow must not run without exact model-byte identity");
+    },
+  }));
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.report.status, "blocked");
+  assert.ok(result.report.readiness.blockers.includes("rembg-weight-fingerprint-incomplete"));
+  assert.equal(workflowCalls, 0);
+  assert.equal(result.report.output, null);
+  assert.equal(result.report.mapReady, false);
+});
+
+test("fails the smoke if model artifact bytes drift during inference", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  let inventoryCalls = 0;
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    collectWorkerHostInventory: async (options) => {
+      const inventory = await fakeWorkerHostInventory(options);
+      inventoryCalls += 1;
+      if (inventoryCalls === 2) {
+        inventory.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
+      }
+      return inventory;
+    },
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  assert.equal(inventoryCalls, 2);
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.equal(result.report.workerHost.stableAcrossInference, false);
+  assert.match(result.report.failure.summary, /model artifacts or TripoSR runner fingerprint changed/i);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
 });
 
 test("blocks before workflow execution when rembg cache is missing", async (t) => {
@@ -647,5 +1040,121 @@ test("enforces the media-to-model workflow's 60-character job ID limit before cr
   await assert.rejects(
     stat(path.join(root, ".building-engine", "runtime-smokes")),
     /ENOENT/,
+  );
+});
+
+test("refuses to reuse an existing generation artifact receipt path", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const receiptPath = path.join(root, ".building-engine", "runtime-smokes", "smoke-job.artifact.json");
+  await mkdir(path.dirname(receiptPath), { recursive: true });
+  await writeFile(receiptPath, "{}");
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source)),
+    /Generation artifact receipt already exists; use a fresh ID/i,
+  );
+});
+
+
+test("binds optional ellipsoidal vertical GCPs through smoke, receipt and offline verifier", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  await mkdir(path.join(root, "survey"), { recursive: true });
+  const earthRadiusM = 6378137;
+  const baseLongitude = 90.4;
+  const baseLatitude = 23.7;
+  const controls = [[-10, -8], [10, -8], [10, 8], [-10, 8]].map(([modelX, modelZ], index) => ({
+    id: "gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    longitude: baseLongitude + (2 * modelX - modelZ + 100) /
+      (earthRadiusM * Math.cos(baseLatitude * Math.PI / 180)) * 180 / Math.PI,
+    latitude: baseLatitude + (modelX + 2 * modelZ + 200) /
+      earthRadiusM * 180 / Math.PI,
+    evidenceSourceId: "facade-photo",
+  }));
+  const horizontalScale = Math.sqrt(5);
+  const manifest = {
+    schemaVersion: "1.1.0",
+    kind: "single-image-control-point-manifest",
+    buildingId: fixture.id,
+    source: { sourceId: "facade-photo", sha256: source.sha256 },
+    horizontalCrs: "EPSG:4326",
+    horizontalDatum: "WGS84",
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    survey: {
+      method: "RTK GNSS",
+      reference: "horizontal-survey-fixture-2026-11-04",
+      observedAtUtc: "2026-11-04T10:00:00.000Z",
+      horizontalAccuracyM: 0.05,
+    },
+    controlPoints: controls,
+    vertical: {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: "WGS 84 (G2139)",
+      coordinateEpoch: 2022.25,
+      survey: {
+        method: "RTK GNSS ellipsoidal-height observation",
+        reference: "vertical-survey-fixture-2026-11-04",
+        observedAtUtc: "2026-11-04T10:30:00.000Z",
+        verticalAccuracyM: 0.04,
+      },
+      controlPoints: controls.map((point, index) => ({
+        horizontalControlPointId: point.id,
+        modelY: index * 1.5,
+        ellipsoidalHeightM: 135 + horizontalScale * index * 1.5,
+        evidenceSourceId: "facade-photo",
+      })),
+    },
+  };
+  const manifestPath = path.join(root, "survey", "controls.json");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    controlPointManifestPath: "survey/controls.json",
+    spawnImpl: (_executable, _args, options) => {
+      const child = new EventEmitter();
+      queueMicrotask(async () => {
+        await writeFakeModelLoadReceipt(options);
+        await writeFakeSourceImageLoadReceipt(options, _args);
+        child.emit("spawn");
+      });
+      return child;
+    },
+    runWorkflow: async (options) => {
+      assert.deepEqual(options.controlPoints, controls);
+      return fakeWorkflowResult(options, root, source);
+    },
+  }));
+  assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
+  assert.equal(result.report.status, "passed");
+  assert.equal(result.report.schemaVersion, "1.6.0");
+  assert.equal(result.report.georeferenceEvidence.schemaVersion, "1.1.0");
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.heightOffsetM, 135);
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.controls.thresholdPass, true);
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.mapReady, false);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.2.0");
+
+  const verified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(verified.verified, true);
+  assert.equal(verified.georeferenceEvidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
+
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  assert.equal(receipt.schemaVersion, "1.2.0");
+  assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
+
+  manifest.vertical.coordinateEpoch = 2023.0;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /manifest bytes or identity/i,
   );
 });

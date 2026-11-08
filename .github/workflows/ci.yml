@@ -85,20 +85,64 @@ on:
       - integration/brf14-main-refresh-20261103
       - integration/p37-floorplan-refresh-20261103
       - integration/p34-main-after-p37-20261103
-      - feat/brf04-open-boundary-disconnected-regressions-20261107
-      - feat/glb-qa-ignore-unreferenced-vertices-20261107
-      - feat/glb-qa-scene-transformed-bounds-20261107
-      - feat/glb-qa-sparse-accessors-20261107
-      - feat/glb-qa-position-accessor-bounds-20261107
-      - feat/glb-qa-nontriangle-position-bounds-20261107
-      - feat/glb-qa-primitive-mode-enum-20261107
-      - feat/glb-qa-index-count-limit-20261107
-      - test/glb-qa-unindexed-and-skipped-bounds-20261107
+      - feat/d3m-engine04-model-artifact-provenance-20261104
+      - feat/d3m-engine05-process-model-load-attestation-20261104
+      - feat/d3m-engine06-source-image-load-attestation-20261104
+      - feat/d3m-engine07-generation-artifact-receipt-20261104
+      - feat/d3m-engine08-georeference-evidence-binding-20261104
+      - feat/d3m-engine09-signed-georeference-review-package-20261104
+      - feat/d3m-engine10-registry-bound-review-package-signatures-20261104
+      - feat/d3m-engine11-signing-integrity-preflight-20261104
+      - feat/d3m-engine12-stable-signature-verification-20261104
+      - feat/d3m-engine13-ellipsoidal-height-evidence-20261104
+      - feat/d3m-engine14-independent-3d-checkpoints-20261104
+      - feat/d3m-engine15-byte-verified-survey-records-20261105
+      - feat/d3m-engine16-surveyor-record-attestations-20261105
+      - feat/d3m-engine17-device-record-attestations-20261105
+      - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
+      - feat/d3m-engine19-review-package-enrollment-evidence-20261105
+      - feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105
+      - feat/d3m-engine21-signed-trust-registry-governance-20261105
+      - feat/d3m-engine22-persisted-governance-state-20261105
+      - feat/d3m-engine23-external-monotonic-store-provider-20261105
+      - feat/d3m-engine24-provider-conformance-20261105
+      - feat/d3m-engine25-provider-qualification-evidence-20261107
+      - feat/d3m-engine26-process-isolated-provider-conformance-20261107
+      - feat/d3m-engine27-process-qualification-report-bridge-20261107
+      - feat/d3m-engine28-signed-process-report-attestation-20261107
+      - feat/d3m-engine29-independent-anchor-witness-20261107
 
   workflow_dispatch:
   pull_request:
     branches:
       - main
+      - feat/d3m-engine03-evidence-backed-vertical-slice-20261103
+      - feat/d3m-engine04-model-artifact-provenance-20261104
+      - feat/d3m-engine05-process-model-load-attestation-20261104
+      - feat/d3m-engine06-source-image-load-attestation-20261104
+      - feat/d3m-engine07-generation-artifact-receipt-20261104
+      - feat/d3m-engine08-georeference-evidence-binding-20261104
+      - feat/d3m-engine09-signed-georeference-review-package-20261104
+      - feat/d3m-engine10-registry-bound-review-package-signatures-20261104
+      - feat/d3m-engine11-signing-integrity-preflight-20261104
+      - feat/d3m-engine12-stable-signature-verification-20261104
+      - feat/d3m-engine13-ellipsoidal-height-evidence-20261104
+      - feat/d3m-engine14-independent-3d-checkpoints-20261104
+      - feat/d3m-engine15-byte-verified-survey-records-20261105
+      - feat/d3m-engine16-surveyor-record-attestations-20261105
+      - feat/d3m-engine17-device-record-attestations-20261105
+      - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
+      - feat/d3m-engine19-review-package-enrollment-evidence-20261105
+      - feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105
+      - feat/d3m-engine21-signed-trust-registry-governance-20261105
+      - feat/d3m-engine22-persisted-governance-state-20261105
+      - feat/d3m-engine23-external-monotonic-store-provider-20261105
+      - feat/d3m-engine24-provider-conformance-20261105
+      - feat/d3m-engine25-provider-qualification-evidence-20261107
+      - feat/d3m-engine26-process-isolated-provider-conformance-20261107
+      - feat/d3m-engine27-process-qualification-report-bridge-20261107
+      - feat/d3m-engine28-signed-process-report-attestation-20261107
+      - feat/d3m-engine29-independent-anchor-witness-20261107
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -147,16 +191,6 @@ on:
       - feat/brf46-source-operation-scope-gate
       - development
       - feat/d3m02-generation-job-map-publish-20261101
-      - feat/brf04-topology-defect-regression-20261103
-      - feat/brf04-open-boundary-disconnected-regressions-20261107
-      - feat/glb-qa-ignore-unreferenced-vertices-20261107
-      - feat/glb-qa-scene-transformed-bounds-20261107
-      - feat/glb-qa-sparse-accessors-20261107
-      - feat/glb-qa-position-accessor-bounds-20261107
-      - feat/glb-qa-nontriangle-position-bounds-20261107
-      - feat/glb-qa-primitive-mode-enum-20261107
-      - feat/glb-qa-index-count-limit-20261107
-      - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
       - feat/d3m01g-registry-preflight-20261031
       - feat/d3m01c-candidate-evidence-handoff-20261030
@@ -198,6 +232,74 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Test trusted survey-device registry and exact-byte device attestations
+        run: npm run test:survey-observation-device-attestation
+
+      - name: Validate survey observation device-attestation signing CLI
+        run: npm run sign:survey-observation-device-attestation -- --help
+
+      - name: Test authority-signed survey-device enrollment evidence
+        run: npm run test:survey-device-enrollment-evidence
+
+      - name: Test exact external trust-registry snapshot inventory
+        run: npm run test:trust-registry-snapshot
+
+      - name: Test signed trust-registry governance and anti-rollback
+        run: npm run test:trust-registry-governance
+
+      - name: Test persisted trust-registry governance sequence state
+        run: npm run test:trust-registry-governance-state
+
+      - name: Test external monotonic trust-registry governance store provider
+        run: npm run test:trust-registry-governance-external-store
+
+      - name: Test external governance provider contract conformance
+        run: npm run test:trust-registry-governance-provider-conformance
+
+      - name: Test process-isolated external governance provider conformance
+        run: npm run test:trust-registry-governance-provider-process-conformance
+
+      - name: Test D3M-26 process-report binding into D3M-25 qualification
+        run: npm run test:trust-registry-governance-provider-process-report
+
+      - name: Test D3M-28 trusted signer process-report attestation
+        run: node --test tests/trust-registry-governance-provider-process-report-signature.test.mjs
+
+      - name: Validate D3M-28 report signer CLI
+        run: node scripts/sign-trust-registry-governance-provider-process-report.mjs --help
+      - name: Test D3M-29 independent anchor challenge and witness verification
+        run: npm run test:trust-registry-governance-provider-anchor-witness
+
+      - name: Validate D3M-29 anchor challenge CLI
+        run: node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs --help
+
+      - name: Validate D3M-29 anchor witness verification CLI
+        run: node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs --help
+
+      - name: Validate process-isolated provider runner CLI
+        run: node scripts/run-trust-registry-governance-provider-process-conformance.mjs --help
+
+      - name: Test external provider qualification evidence gate
+        run: npm run test:trust-registry-governance-provider-qualification
+
+      - name: Validate current external provider qualification remains blocked
+        run: |
+          mkdir -p artifacts
+          npm run validate:trust-registry-governance-provider-qualification -- benchmarks/trust-registry-governance/provider-qualification-current.json --report artifacts/d3m25-provider-qualification-report.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/d3m25-provider-qualification-report.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The unprovisioned external provider must remain blocked.");
+          if (report.productionQualificationEligible !== false) throw new Error("Provider qualification must not enable production eligibility.");
+          if (!report.blockers.includes("real-provider-not-provisioned")) throw new Error("Missing real-provider provisioning blocker.");
+          if (!report.blockers.includes("real-provider-integration-suite-not-passed")) throw new Error("Missing real-provider integration blocker.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("D3M-25 must keep all release flags false.");
+          console.log("D3M-25 current state validated: no real provider, qualification blocked, all release flags false.");
+          NODE
+
+      - name: Validate survey-device enrollment evidence verifier CLI
+        run: npm run verify:survey-device-enrollment-evidence -- --help
 
       - name: Test feature picking controller lifecycle
         run: npm run test:feature-picking-controller
@@ -285,6 +387,12 @@ jobs:
 
       - name: Test end-to-end media-to-model orchestration
         run: npm run test:media-to-model-workflow
+
+      - name: Test evidence-backed building-to-map vertical slice
+        run: npm run test:evidence-backed-vertical-slice
+
+      - name: Test exact reviewed vertical-slice publication to Cesium catalog
+        run: npm run test:publish-evidence-backed-vertical-slice
 
       - name: Test durable generation queue, authenticated API gate and end-to-end worker
         run: npm run test:generation-queue
@@ -618,11 +726,32 @@ jobs:
       - name: Test immutable building review package
         run: npm run test:building-review-package
 
-      - name: Test offline review package integrity verifier
+      - name: Test offline review package integrity including D3M-19 enrollment evidence
         run: npm run test:building-review-package-integrity
 
-      - name: Test Ed25519 review package manifest signatures
+      - name: Test filesystem-safe review package inventory
+        run: npm run test:building-review-package-directory
+
+      - name: Test stable signed-package verification-window race guards
+        run: node --test --test-name-pattern="verification-window guard" tests/building-review-package-directory.test.mjs
+
+      - name: Test registry-bound Ed25519 review package signatures and CLI
         run: npm run test:building-review-package-signature
+
+      - name: Test trusted-surveyor registry and observation attribution signatures
+        run: npm run test:survey-observation-attribution
+
+      - name: Validate survey observation attribution signing CLI
+        run: npm run sign:survey-observation-attribution -- --help
+
+      - name: Validate signed review package verification CLI
+        run: npm run verify:signed-building-review-package -- --help
+
+      - name: Validate registry-bound review package signing CLI
+        run: npm run sign:building-review-package -- --help
+
+      - name: Validate registry-bound review package signature verifier CLI
+        run: npm run verify:building-review-package-signature -- --help
 
       - name: Test evidence-based building accuracy benchmark
         run: npm run test:building-accuracy-benchmark

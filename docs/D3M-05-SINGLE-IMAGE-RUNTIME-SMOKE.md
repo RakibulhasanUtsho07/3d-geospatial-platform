@@ -1,9 +1,9 @@
 # D3M-05 — Offline single-image runtime smoke
 
 **Tracking issue:** [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307)  
-**Dependency:** D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
-**Implementation branch:** feat/d3m05-single-image-runtime-smoke-20261102  
-**Status:** Implementation candidate. Do not call the runtime smoke passed until an operator runs it on the actual worker host with the actual TripoSR, ONNX Runtime, rembg model and selected device. CI exercises the orchestration contract with fakes and never downloads model weights.
+**Source integration:** D3M-05 implementation is integrated into `main` through cumulative promotion PR [#325](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/325). The original implementation PR [#308](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/308) is closed as superseded, not merged independently.  
+**Worker-host tooling:** inventory/preflight added to `main` through [D3M-ENGINE-02 PR #347](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/347). D3M-ENGINE-04 extends the inventory and smoke evidence with exact TripoSR/rembg model-file fingerprints on a stacked feature branch; this follow-up is not yet merged.  
+**Status:** Implementation and automated CI validation are complete on `main`; the real TripoSR/rembg worker-host inference, independent GLB verification and human inspection are **not run**. Never call the runtime smoke passed until those operator-host steps succeed.
 
 ## Purpose and contract
 
@@ -38,6 +38,22 @@ Do not assume that the default rembg model is commercially licensed for every us
 
 D3M-04's worker health endpoint must report single-image-ai.status=ready, modelWeights=cached and backgroundRemovalWeights=cached before the smoke will start. The smoke performs this preflight again immediately before invoking the workflow.
 
+## Exact worker model-byte provenance — D3M-ENGINE-04
+
+The D3M-ENGINE-04 smoke schema (`1.1.0`) records a redacted worker-host fingerprint snapshot immediately before and after the media-to-model workflow:
+
+- TripoSR runner script byte length and SHA-256.
+- TripoSR `config.yaml` byte length, SHA-256 and Hugging Face snapshot revision.
+- TripoSR `model.ckpt` byte length, SHA-256 and matching snapshot revision.
+- Active rembg model identifier, weight byte length and SHA-256.
+
+The worker inventory hashes model files as regular files in 8 MiB chunks. It compares file identity, size, modification time and change time before/after each read, and fails closed for incomplete or malformed fingerprints. Cache paths and file contents are never written into the inventory or smoke report.
+
+The smoke compares the pre-inference and post-inference fingerprints. A mismatch makes the run fail; a stable pair is retained in the private report. The independent verifier checks the schema, digest formats, positive byte counts, snapshot consistency and exact pre/post equality. Legacy schema `1.0.0` reports can still be integrity-verified, but their result is labelled `not-recorded-legacy-schema` rather than being treated as model-byte fingerprint evidence.
+
+**Evidence limit:** matching snapshots show that the observed cache files and runner had the same fingerprints at the two inventory checks. They do not prove which exact bytes the TripoSR/rembg processes opened, rule out a replace-and-restore event between checks, prove model authenticity/licensing, or establish reconstruction accuracy. The hashes provide byte identity and reproducibility evidence only. Model-weight licensing and human review remain separate.
+
+Hashing reads the full config/checkpoint/rembg weight files twice and adds I/O/CPU time proportional to their combined size. It uses bounded memory rather than loading full model weights. The default --inventory-timeout-ms is 180,000 ms and the supported range is 1,000–180,000 ms; increase from a smaller chosen value when the worker storage is slow. The standalone inventory CLI uses the same 180,000 ms default and bound. No model file is copied or uploaded.
 ## Operator procedure
 
 Use an isolated test building ID and a test image whose reuse rights permit this inference. The image path must be a workspace-relative path to an already-stored JPEG/PNG file. Do not use a source path outside the worker's shared workspace.
@@ -45,7 +61,7 @@ Use an isolated test building ID and a test image whose reuse rights permit this
 Example (PowerShell; replace every placeholder with a real value from the worker host):
 
 ~~~powershell
-npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --triposr-licence-review "Record the TripoSR code and checkpoint licence/terms reviewed" --rembg-licence-review "Record the exact rembg model ID and weight terms reviewed" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-operation-scopes --confirm-single-view-inference --confirm-model-licences
+npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --triposr-licence-review "Record the TripoSR code and checkpoint licence/terms reviewed" --rembg-licence-review "Record the exact rembg model ID and weight terms reviewed" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --inventory-timeout-ms 180000 --confirm-source-rights --confirm-operation-scopes --confirm-single-view-inference --confirm-model-licences
 ~~~
 
 The example runner path is illustrative; ensure the actual file path is correct. Use a new smoke jobId and sourceId for every run. The operation-scope confirmation is separate from the rights confirmation: it authorizes private-media-ingestion and single-image-ai-reconstruction for that exact source. Evidence files are immutable; an existing source record, job state, workflow artifact directory, TripoSR sub-job directory or smoke report is rejected rather than reused.
@@ -70,7 +86,7 @@ Exit codes:
 - A temporary Python sitecustomize.py denies Python socket connection, connect-ex, send-to and connection-helper calls for the smoke subprocess tree. The temporary policy file is removed after the invocation.
 - This is application-level Python socket blocking, **not** operating-system or kernel network isolation. Run the smoke on a host/network policy that already prevents outbound access when strict isolation is required. The report explicitly records that boundary.
 - The readiness preflight uses local-only model-cache resolution. It does not instantiate a rembg session or request weights.
-- Source and model artifacts remain inside the private workflow directory. The smoke report contains only relative paths, safe model identifiers, source/output hashes, byte counts, the selected device and sanitized QA summary. It does not copy cache paths, API secrets, or raw subprocess output into the smoke evidence.
+- Source and model artifacts remain inside the private workflow directory. The smoke report contains only relative paths, safe model identifiers, source/output hashes, byte counts, the selected device, sanitized QA summary and redacted model artifact hashes. It does not copy cache paths, model weights, API secrets, or raw subprocess output into the smoke evidence.
 - On POSIX hosts, the runtime-smokes evidence directory is enforced as owner-only (0700) and report files are written owner-only (0600). On Windows, Node's mode bits do not provide equivalent ACL isolation; provision the worker workspace with a Windows ACL that grants access only to the worker/operator identities that need the evidence.
 - The source-rights and operation-scope confirmations are separate operator attestations. The command also requires separate text records describing the TripoSR code/checkpoint licence terms and the installed rembg model-weight terms reviewed by the operator. These statements are not independent legal verification or proof of a commercial grant.
 
@@ -102,13 +118,13 @@ After the smoke process exits, re-open the on-disk evidence with the separate ve
 npm run verify:single-image-runtime-smoke -- "D:\BuildingEngineWorkspace" "smoke-dhaka-front-20261102"
 ~~~
 
-The verifier independently reads the report, rejects symlinked/out-of-workspace paths, re-hashes the source and GLB, verifies byte counts and GLB 2.0 mesh structure, and checks that the report's readiness, separate operation-scope attestation and release flags remain fail-closed. It detects accidental source/output changes after the smoke. This is artifact-integrity verification, not a digital signature: it does not independently prove the source licence, model-weight licence, report author, physical building identity or architectural accuracy.
+The verifier independently reads the report, rejects symlinked/out-of-workspace paths, re-hashes the source and GLB, verifies byte counts and GLB 2.0 mesh structure, validates the before/after worker model fingerprints for schema `1.1.0`, and checks that readiness, source operation-scope attestation and release flags remain fail-closed. It detects source/GLB/report fingerprint inconsistencies. This is artifact-integrity verification, not a digital signature: it does not independently prove source/model licences, report author, physical building identity, which cache bytes the inference process opened, or architectural accuracy.
 
 ## Automated test scope
 
 npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, simulated TripoSR child-process spawn evidence, pre-runner and failed-spawn classification, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
 
-Full CI must pass on the exact current D3M-05 PR head; a green result from an earlier commit does not validate later changes. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.
+The D3M-02/03/04/05/06/07 implementation stack has since been reconciled onto `main` through PR #325. The post-promotion `main` CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps on `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`, including the D3M-05 smoke contract test and smoke/verifier CLI checks. This is automated code/test validation only; it is not a real worker-host inference result.
 
 ## Operator-host preflight and evidence capture
 
@@ -152,3 +168,68 @@ The D3M-05 smoke repeats the same single-image-only capability check immediately
 The preflight requests only the `single-image-ai` strategy; it does not launch the unrelated COLMAP `--help` checks. The configured TripoSR `run.py` is opened and syntax-compiled in memory, but its top-level code and `--help` handler are never executed. The Python subprocess disables bytecode writes and sets Hugging Face offline/telemetry flags while checking packages and local cache metadata. Package imports still execute installed package initialization code and may have package-specific side effects; the preflight is not a hermetic read-only environment, OS sandbox or network firewall. Apply host/network egress controls when strict no-egress or no-write guarantees are required.
 
 A `ready` result is only a precondition. It does not prove that the runner will complete inference, that model terms permit the intended use, that sufficient GPU memory is available, or that the resulting building geometry is accurate. Continue with the D3M-05 smoke only after source rights and both model licences have been reviewed; then run the independent evidence verifier and human GLB inspection.
+
+
+## Main promotion and current real-host status — 2026-11-03
+
+- D3M-05 implementation, D3M-04 capability readiness, D3M-06 reviewed placement and D3M-07 preflight were integrated into `main` by cumulative promotion PR [#325](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/325). The earlier stacked PR #308 is closed as superseded; its code is part of the main-based integration.
+- D3M-ENGINE-02 consolidated worker-host inventory was added by [PR #347](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/347). Its squash merge commit is `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`, the current main head.
+- Post-merge main Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) completed successfully: 207/207 steps. It passed D3M-05 runtime-smoke contract tests (step 138), D3M-07 preflight tests (139), host inventory tests/CLI (140–141), and D3M-05 smoke/verifier CLI validation (143–144).
+- These tests use fake workflow execution and synthetic GLB fixtures. They do **not** run real TripoSR/rembg weights, GPU kernels, a provisioned worker host or a rights-cleared image.
+- **Still outstanding:** run the host inventory and single-image preflight on the actual provisioned worker environment; review source and model-weight terms; execute one fresh D3M-05 smoke with fresh IDs and all four operator confirmations; run the independent verifier; inspect the private GLB in an independent viewer; record the sanitized result using the evidence-log template.
+- Tracking remains open in [issue #307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307). Keep `mapReady=false`, `publicationEligible=false` and `automaticApproval=false`. No private source image, smoke JSON, GLB, model weights, cache path or raw worker log belongs in Git.
+
+## D3M-ENGINE-03 integration status — 2026-11-04
+
+- The evidence-backed multi-view orchestration is being validated on [PR #351](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/351), based on current `main@bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- The orchestration's media and architectural-geometry outputs remain distinct child candidates; its new parent guard binds each child report to the exact building ID, child job ID and expected workflow/profile. This does not replace the fresh single-image worker smoke described above.
+- The real TripoSR/rembg worker-host inference is still not recorded in issue [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307). CI uses fixtures/fakes and must not be reported as real inference.
+- Keep D3M-05 runtime acceptance, independent GLB inspection and all production release flags blocked until the actual host run and verifier evidence are supplied.
+
+
+## D3M-ENGINE-05 process-side model-load evidence — 2026-11-04
+
+The smoke report schema is upgraded to `1.2.0`. In addition to D3M-ENGINE-04's pre/post inventory fingerprints, the exact TripoSR runner process receives a private receipt destination and the three expected pre-inference SHA-256/byte-count pairs. A temporary Python `sitecustomize.py` instruments these loader boundaries:
+
+- `omegaconf.OmegaConf.load` for the TripoSR `config.yaml`.
+- `torch.load` for the TripoSR `model.ckpt`.
+- `onnxruntime.InferenceSession` for the active rembg ONNX model.
+
+For TripoSR config/checkpoint, the instrumentation opens the regular file, hashes it through a bounded-memory descriptor, verifies device/inode/size/mtime/ctime identity, and hands that same open descriptor to the loader. It verifies the descriptor again after the loader returns. For rembg ONNX files, it reads a regular file of at most 512 MiB into one immutable bytes object, hashes that object and passes the same object to ONNX Runtime. Missing or unsupported loader behavior fails closed. The smoke requires all three path-redacted receipts to match the D3M-ENGINE-04 pre-inference hashes and byte counts before it can report `passed`.
+
+Only role, loader name, byte count, SHA-256 and stable/exact-bytes booleans are stored in the private receipt/report. No model path, cache path, model bytes or raw loader output is recorded. The receipt file is private (0600 where POSIX mode controls apply) and lives in the temporary directory removed after the smoke.
+
+**Compatibility and limitations:** the independent verifier understands smoke schemas `1.0.0`, `1.1.0` and `1.2.0`. Schema 1.0.0 has no worker model fingerprints; schema 1.1.0 has pre/post fingerprints but no process-side loader receipts; both are explicitly labelled as legacy evidence. Only schema 1.2.0 requires and validates the three loader receipts. This is process-side instrumentation, not signed OS/hardware attestation: a modified or malicious runner could bypass the patched APIs or use an alternate loader. A compatibility change in the installed TripoSR/rembg stack that avoids these hooks must fail closed and be investigated rather than weakening the requirement.
+
+Reading a rembg ONNX model into memory adds up to 512 MiB peak model-buffer memory to the worker; plan RAM headroom accordingly. The instrumented file reads are bounded-memory for TripoSR config/checkpoint; they add I/O proportional to artifact size. This evidence establishes which exact bytes were handed to these instrumented loader APIs. It does not prove licence permission, successful/accurate inference, model trustworthiness, physical building truth, metric scale or georeferencing.
+
+The D3M-ENGINE-05 implementation is tracked in [issue #354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/354) and is stacked on the D3M-ENGINE-04 branch/PR #353. Automated fixtures exercise the loader hooks; they are not a real worker-host inference. Continue to keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until the separate real-host, rights, reviewer, survey and human-inspection gates are completed.
+
+
+## Process-side source-image loader evidence (D3M-ENGINE-06)
+
+Smoke schema `1.3.0` adds a separate `sourceLoadEvidence` object. The exact TripoSR child process receives the worker's actual source-path argument plus the expected source SHA-256/byte count through private environment variables. A temporary Python `sitecustomize.py` observes `PIL.Image.open`, captures the source through a bounded descriptor read with before/after file-identity checks, and passes those same bytes to Pillow using an in-memory `io.BytesIO`. Repeated opens of the selected source reuse the cached bytes. The private receipt contains only role `sourceImage`, loader `PIL.Image.open`, bytes, SHA-256 and exact/stable booleans; it never stores the path.
+
+The smoke requires exactly one valid source-image receipt bound to the report's `source.bytes` and `source.sha256`. A changed source, unrecognized loader input, malformed/duplicate receipt, or missing receipt blocks a successful smoke. The three D3M-ENGINE-05 model loader receipts remain separately mandatory.
+
+The independent verifier accepts legacy smoke schemas `1.0.0`, `1.1.0` and `1.2.0`, but labels them as having no source-image loader evidence. Only schema `1.3.0` requires and validates the Pillow receipt. This is process-side loader instrumentation, not OS/hardware attestation; it does not prove rights, building identity, model accuracy, metric scale or georeferencing. See [D3M-ENGINE-06](./D3M-ENGINE-06-SOURCE-IMAGE-LOAD-ATTESTATION.md) for the implementation contract and limits.
+
+
+## D3M-ENGINE-07 generation artifact receipt (smoke schema 1.4.0)
+
+A successful schema `1.4.0` smoke now writes a separate, write-once `.building-engine/runtime-smokes/<jobId>.artifact.json` receipt. The smoke report contains a relative path plus the exact receipt byte count, SHA-256 and canonical payload SHA-256. The receipt joins the on-disk media-to-model `workflow-report.json`, selected source and Pillow decoder evidence, pre/post TripoSR/rembg worker fingerprints, all three D3M-ENGINE-05 process-side model-loader receipts, the emitted GLB bytes/hash/mesh count and the geometry-QA summary. The workflow report is itself re-read and hashed before the receipt is created.
+
+The independent verifier re-hashes the receipt and workflow report, checks their exact identity and cross-bindings, then independently re-hashes the source/GLB and re-computes geometry QA. A missing, substituted, modified or malformed receipt/report fails closed. Smoke schemas `1.0.0`–`1.3.0` remain verifiable and are labelled `not-recorded-legacy-schema` for the new receipt; only `1.4.0` requires it. See [D3M-ENGINE-07](./D3M-ENGINE-07-GENERATION-ARTIFACT-RECEIPT.md).
+
+This local write-once/hash-bound sidecar is not a signature, hardware attestation or tamper-proof storage. It does not prove rights, model licence, accuracy, scale, georeferencing or survey truth. It cannot enable `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` or `automaticApproval`.
+
+
+## D3M-ENGINE-08 — optional single-image ground-control evidence (smoke schema 1.5.0)
+
+The single-image runtime smoke accepts an optional workspace-relative control-point manifest JSON file. It binds the building ID, selected source ID and exact source-image SHA-256; declares horizontal CRS EPSG:4326 and horizontal datum WGS84; explicitly leaves vertical datum not-provided; and records survey method/reference/date and declared horizontal accuracy. At least three unique, non-collinear controls are required, and every point must identify the selected source through evidenceSourceId.
+
+The smoke validates and hashes the manifest before model generation, passes the normalized control points and configured RMS/max-residual thresholds into the existing registerModelToWgs84 workflow, then re-reads the manifest after generation and rejects byte/hash drift. The registration is tied to the exact GLB SHA-256 in smoke report schema 1.5.0 and generation-artifact receipt schema 1.1.0.
+
+The independent verifier re-reads and hashes the manifest, validates the building/source binding and recomputes the WGS84 horizontal similarity registration. It rejects altered manifest bytes, changed control points, wrong GLB/source identity, or registration that differs from the workflow report or artifact receipt. Smoke schemas 1.0.0–1.4.0 and receipt schema 1.0.0 remain supported; only schema 1.5.0 requires georeference evidence. No-manifest runs are explicitly labelled not-requested.
+
+Trust limits: survey metadata and control points are operator-supplied, not independently authenticated. A low residual does not prove that points correspond to the correct GLB vertices, prove survey quality, solve height datum or establish model accuracy. Horizontal registration remains human-review-only. Keep groundTruth, acceptanceEligible, publicationEligible, mapReady and automaticApproval false.

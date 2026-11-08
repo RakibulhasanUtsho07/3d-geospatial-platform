@@ -226,8 +226,10 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const checks = [];
   const add = (id, pass, detail, fail = false) => checks.push({ id, status: pass ? "passed" : fail ? "failed" : "warning", detail });
   const sources = manifest.sources;
-  const videos = sources.filter((source) => source.purpose === "capture" && source.kind === "video");
+  // Only decoded stills/frames count as independently inspectable reconstruction views.
+  // A raw video must have linked extracted-frame evidence before it can satisfy side coverage.
   const captured = sources.filter((source) => source.purpose === "capture" && ["photo", "video-frame"].includes(source.kind));
+  const videos = sources.filter((source) => source.purpose === "capture" && source.kind === "video");
   const references = sources.filter((source) => source.purpose === "reference" && ["photo", "video-frame"].includes(source.kind));
   const measurementSources = sources.filter((source) => source.purpose === "measurement-evidence");
   const rightsOk = (source) => ["verified", "operator-attested"].includes(source.rights.status) &&
@@ -245,12 +247,12 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const captureSides = new Set(validCaptures.map((source) => source.side));
   const captureCoverage = validCaptures.length >= 4 && ["front", "back", "left", "right"].every((side) => captureSides.has(side));
   add("capture-source-coverage-and-rights", captureCoverage,
-    "At least four hash-declared capture assets must cover front/back/left/right and have reviewed rights evidence.");
+    "At least four hash-declared still images or extracted video frames must cover front/back/left/right and have reviewed rights evidence.");
   const videosWithFrames = videos.filter((video) => sources.some((source) =>
     source.purpose === "capture" && source.kind === "video-frame" &&
     nonEmpty(video.sourceId) && source.sourceId === video.sourceId));
   add("video-frame-extraction", videos.length === 0 || videosWithFrames.length === videos.length,
-    "Raw videos do not count as a facade view until extracted video-frame evidence is linked to each video source.");
+    "Raw videos do not count as facade views until extracted video-frame evidence is linked to each video source.");
   const validCaptureHashes = validCaptures.map((source) => source.sha256.toLowerCase());
   const duplicateCaptureBytes = new Set(validCaptureHashes).size !== validCaptureHashes.length;
   add("capture-source-byte-uniqueness", validCaptureHashes.length > 0 && !duplicateCaptureBytes,
