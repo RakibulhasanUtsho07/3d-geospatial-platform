@@ -242,9 +242,123 @@ function encodeGlb(spec, geo, facadeOrientation) {
   const bh=Buffer.alloc(8);bh.writeUInt32LE(bin.length,0);bh.writeUInt32LE(0x004e4942,4);
   return Buffer.concat([header,jh,json,bh,bin]);
 }
+function createRectangularRoofFrame(points) {
+  if (!Array.isArray(points) || points.length !== 4) {
+    throw new TypeError("Pitched roofs currently require a four-corner rectangular footprint.");
+  }
+  const edges = points.map((point, index) => {
+    const next = points[(index + 1) % points.length];
+    return { x: next.x - point.x, z: next.z - point.z };
+  });
+  const lengths = edges.map(edge => Math.hypot(edge.x, edge.z));
+  if (lengths.some(length => !Number.isFinite(length) || length < 0.25)) {
+    throw new TypeError("Pitched roof footprint edges must each be at least 0.25 metres.");
+  }
+  const close = (a, b) => Math.abs(a - b) <= Math.max(a, b) * 0.02;
+  if (!close(lengths[0], lengths[2]) || !close(lengths[1], lengths[3])) {
+    throw new TypeError("Pitched roofs require opposite footprint edges with matching measured lengths.");
+  }
+  for (let index = 0; index < 4; index++) {
+    const current = edges[index], next = edges[(index + 1) % 4];
+    const cosine = (current.x * next.x + current.z * next.z) / (lengths[index] * lengths[(index + 1) % 4]);
+    if (Math.abs(cosine) > 0.02) {
+      throw new TypeError("Pitched roofs require a rectangular footprint with perpendicular adjacent edges.");
+    }
+  }
+  const longEdgeIndex = lengths[0] >= lengths[1] ? 0 : 1;
+  const shortEdgeIndex = longEdgeIndex === 0 ? 1 : 0;
+  const longLength = lengths[longEdgeIndex];
+  const shortLength = lengths[shortEdgeIndex];
+  const longAxis = {
+    x: edges[longEdgeIndex].x / longLength,
+    z: edges[longEdgeIndex].z / longLength,
+  };
+  const shortAxis = {
+    x: edges[shortEdgeIndex].x / shortLength,
+    z: edges[shortEdgeIndex].z / shortLength,
+  };
+  const center = {
+    x: points.reduce((sum, point) => sum + point.x, 0) / 4,
+    z: points.reduce((sum, point) => sum + point.z, 0) / 4,
+  };
+  return {
+    longLength,
+    shortLength,
+    longAxis,
+    shortAxis,
+    pointAt(longOffset, shortOffset, y) {
+      return [
+        center.x + longAxis.x * longOffset + shortAxis.x * shortOffset,
+        y,
+        center.z + longAxis.z * longOffset + shortAxis.z * shortOffset,
+      ];
+    },
+  };
+}
+
+function addPitchedRoof(geo, frame, baseY, riseM, style) {
+  const halfLong = frame.longLength / 2;
+  const halfShort = frame.shortLength / 2;
+  const a = frame.pointAt(-halfLong, -halfShort, baseY);
+  const b = frame.pointAt(halfLong, -halfShort, baseY);
+  const c = frame.pointAt(halfLong, halfShort, baseY);
+  const d = frame.pointAt(-halfLong, halfShort, baseY);
+  const ridgeStart = frame.pointAt(-halfLong, 0, baseY + riseM);
+  const ridgeEnd = frame.pointAt(halfLong, 0, baseY + riseM);
+  const negativeShortNormal = [-frame.shortAxis.x, 1, -frame.shortAxis.z];
+  const positiveShortNormal = [frame.shortAxis.x, 1, frame.shortAxis.z];
+  const negativeLongNormal = [-frame.longAxis.x, 1, -frame.longAxis.z];
+  const positiveLongNormal = [frame.longAxis.x, 1, frame.longAxis.z];
+
+  if (style === "gable") {
+    geo.quad("roof", a, b, ridgeEnd, ridgeStart, negativeShortNormal);
+    geo.quad("roof", d, c, ridgeEnd, ridgeStart, positiveShortNormal);
+    geo.triangle("wall", a, d, ridgeStart, [-frame.longAxis.x, 0, -frame.longAxis.z]);
+    geo.triangle("wall", b, c, ridgeEnd, [frame.longAxis.x, 0, frame.longAxis.z]);
+    return;
+  }
+
+  if (style !== "hip") throw new TypeError("unsupported pitched roof style");
+  const ridgeHalfLength = Math.max(0, halfLong - halfShort);
+  if (ridgeHalfLength > 0.05) {
+    const hipRidgeStart = frame.pointAt(-ridgeHalfLength, 0, baseY + riseM);
+    const hipRidgeEnd = frame.pointAt(ridgeHalfLength, 0, baseY + riseM);
+    geo.quad("roof", a, b, hipRidgeEnd, hipRidgeStart, negativeShortNormal);
+    geo.quad("roof", d, c, hipRidgeEnd, hipRidgeStart, positiveShortNormal);
+    geo.triangle("roof", a, d, hipRidgeStart, negativeLongNormal);
+    geo.triangle("roof", b, c, hipRidgeEnd, positiveLongNormal);
+  } else {
+    const apex = frame.pointAt(0, 0, baseY + riseM);
+    geo.triangle("roof", a, b, apex, negativeShortNormal);
+    geo.triangle("roof", b, c, apex, positiveLongNormal);
+    geo.triangle("roof", c, d, apex, positiveShortNormal);
+    geo.triangle("roof", d, a, apex, negativeLongNormal);
+  }
+}
+
 export function generateProceduralGlb(rawSpec) {
   const {spec,derived}=normalizeBuildingSpec(rawSpec), warnings=[];
-  if(spec.architecture.roofType==="pitched")warnings.push("Pitched roofs are not implemented; a flat roof cap is emitted.");
+  const requestedRoofType = spec.architecture.roofType;
+  const roofStyle = requestedRoofType === "hip" ? "hip"
+    : ["pitched", "gable"].includes(requestedRoofType) ? "gable"
+      : "flat";
+  const pitchedRoof = roofStyle !== "flat";
+  const roofFrame = pitchedRoof ? createRectangularRoofFrame(derived.localFootprint) : null;
+  const roofRiseM = pitchedRoof
+    ? spec.architecture.roofRiseM ?? Math.min(2.5, Math.max(0.5, height * 0.15))
+    : 0;
+  const roofBaseY = height + spec.dimensions.parapetHeightM;
+  const roofProfile = pitchedRoof ? {
+    requestedType: requestedRoofType,
+    generatedStyle: roofStyle,
+    riseM: Number(roofRiseM.toFixed(3)),
+    footprintShape: "rectangular",
+    confidence: "estimated",
+    reviewRequired: true
+  } : null;
+  if (pitchedRoof) {
+    warnings.push("Pitched roof geometry uses a parametric rectangular ridge profile; verify ridge direction, rise and roof covering against independent references.");
+  }
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
@@ -491,7 +605,11 @@ export function generateProceduralGlb(rawSpec) {
       for(let r=0;r<=4;r++){const offset=-bw/2+bw*r/4,px=rx+Math.cos(e.yaw)*offset,pz=rz-Math.sin(e.yaw)*offset;geo.box("metal",px,y+0.28,pz,0.035,0.48,0.04);}
     }
   }
-  for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
+  if (pitchedRoof) {
+    addPitchedRoof(geo, roofFrame, roofBaseY, roofRiseM, roofStyle);
+  } else {
+    for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
+  }
   if(spec.dimensions.parapetHeightM>0)for(const e of edges){geo.box("concrete",(e.p.x+e.n.x)/2-e.out.x*wt/2,height+spec.dimensions.parapetHeightM/2,(e.p.z+e.n.z)/2-e.out.z*wt/2,e.len+wt*0.3,spec.dimensions.parapetHeightM,wt,e.yaw);}
   if(spec.architecture.roofType==="terrace"){const b=spec.footprint.bounds,w=b.maxX-b.minX,d=b.maxZ-b.minZ;if(w>2.5&&d>2.5)geo.box("concrete",(b.minX+b.maxX)/2,height+0.025,(b.minZ+b.maxZ)/2,Math.min(w*0.55,4.2),0.05,Math.min(d*0.35,2.8));}
 
@@ -608,8 +726,8 @@ export function generateProceduralGlb(rawSpec) {
   }));
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
-    output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
-    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
+    output:{format:"glb",bytes:glb.byteLength,heightM:Number((roofBaseY+roofRiseM).toFixed(2))},
+    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,roofType:requestedRoofType,roofStyle,roofRiseM:Number(roofRiseM.toFixed(3)),roofProfile,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
     facadeOrientation,
     structuralOpenings:structuralOpeningRecords,
     facadeSelection:{
@@ -643,7 +761,8 @@ export function generateProceduralGlb(rawSpec) {
       frontAxisNeedsReview||
       selectedFacade.reviewRequired||
       structuralOpeningRecords.some(opening=>opening.reviewRequired)||
-      (domePlacement?.reviewRequired===true),
+      (domePlacement?.reviewRequired===true)||
+      (roofProfile?.reviewRequired===true),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
