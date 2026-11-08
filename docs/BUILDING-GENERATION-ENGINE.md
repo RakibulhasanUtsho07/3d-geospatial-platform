@@ -4,7 +4,7 @@ Status: deterministic procedural generation, source-aware BuildingSpec validatio
 
 ## 1. Baseline input → 3D model
 
-**building-spec.mjs** validates BuildingSpec version 1.0.0, WGS84 footprint coordinates and building dimensions, style/material/window/door/balcony parameters, source metadata and confidence-linked evidence. **procedural-glb.mjs** generates a deterministic binary glTF (.glb) with walls, repeated windows/frames, a door, front balconies, roof cap and parapet. **generation-engine.mjs** writes a JSON QA/provenance report. The synthetic fixture is for tests only.
+**building-spec.mjs** validates BuildingSpec version 1.0.0, WGS84 footprint coordinates and building dimensions, style/material/window/door/balcony parameters, source metadata and confidence-linked evidence. **procedural-glb.mjs** generates a deterministic binary glTF (.glb) with walls, repeated windows/frames, a door, front balconies, flat/terrace roof caps, rectangular gable/hip roof profiles and parapets. **generation-engine.mjs** writes a JSON QA/provenance report. The synthetic fixture is for tests only.
 
 ~~~powershell
 npm run test:building-generation
@@ -401,3 +401,10 @@ The authenticated JSON request must explicitly confirm trace review, provide onl
 The service derives the metres-per-source-pixel ratio from the supplied measured segment, converts reviewed candidates to the measured-vector schema and invokes the existing source-hash-checked private GLB candidate builder. It stores `trace-review.json` and binds its SHA-256, trace ID/hash, selected IDs/counts, calibration details and review state into the candidate report. Retrieval verifies the transformation-evidence hash as well as the source, geometry and GLB hashes.
 
 The output is always a draft: `mapReady=false`, `publicationEligible=false`. This process does not independently prove the operator's measurements, source rights, survey control, structural correctness, or architectural fidelity; it also does not infer openings, stairs, furniture, curved/angled walls, or hidden geometry. Review geometry and rights independently and use the explicit review/publication gate in section 14 only after acceptance.
+
+
+## Procedural roof profiles
+
+BuildingSpec supports `flat`, `terrace`, `pitched`, `gable` and `hip` roof types. `pitched` is retained as a compatibility alias for a gable roof. Gable and hip geometry requires a four-corner rectangular footprint; the generator rejects unsupported polygons rather than silently substituting a flat roof. Rectangles may be rotated in the local east/north plane.
+
+Set `architecture.roofRiseM` to specify ridge rise in metres (0.25–10 m). When omitted, the generator uses a bounded parametric estimate based on the building height. Gable end faces are emitted as wall geometry; hip roofs taper to a measured ridge segment or apex for near-square footprints. The report records the requested type, generated style, rise, confidence and review requirement. These roof dimensions remain estimated and must be checked against independent roof references before acceptance or publication.
