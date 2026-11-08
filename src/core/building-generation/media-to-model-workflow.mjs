@@ -185,6 +185,9 @@ export async function runMediaToModelWorkflow(options){
  if(strategy==="tripo-image"&&(options.allowPaidProviderGeneration!==true||options.confirmExternalProviderProcessing!==true)){
   throw new TypeError("tripo-image requires allowPaidProviderGeneration=true and confirmExternalProviderProcessing=true; selected source images will be sent to the paid external provider");
  }
+ if(options.generateMultiviewFromSingleImage===true&&options.confirmSyntheticViewGeneration!==true){
+  throw new TypeError("generateMultiviewFromSingleImage requires confirmSyntheticViewGeneration=true because Tripo creates non-independent side views from one photograph");
+ }
  const effectiveStrategy = strategy === "auto" ? (options.enablePhotogrammetry === true ? "photogrammetry" : "procedural") : strategy;
  const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[effectiveStrategy];
  const earlyRequiredOperationScopes = effectiveStrategy==="tripo-image"?[]:requiredOperationScopes;
@@ -254,6 +257,8 @@ export async function runMediaToModelWorkflow(options){
   singleImageTimeoutMs:options.singleImageTimeoutMs??1800000,
   allowPaidProviderGeneration:options.allowPaidProviderGeneration===true,
   confirmExternalProviderProcessing:options.confirmExternalProviderProcessing===true,
+  generateMultiviewFromSingleImage:options.generateMultiviewFromSingleImage===true,
+  confirmSyntheticViewGeneration:options.confirmSyntheticViewGeneration===true,
   viewLabels:options.viewLabels===undefined?null:jsonSafe(options.viewLabels),
   tripoModel:options.tripoModel??"v3.1-20260211",
   tripoTexture:options.tripoTexture??true,
@@ -429,6 +434,7 @@ export async function runMediaToModelWorkflow(options){
   if(!syncedSpec||!Array.isArray(viewIds))throw new TypeError("stored building-spec-sync artifact is incomplete");
   const normalizedViewLabels = effectiveStrategy==="tripo-image" ? normalizeTripoViewLabels(viewIds, options.viewLabels) : null;
   if(effectiveStrategy==="tripo-image"&&(viewIds.length<1||viewIds.length>4))throw new TypeError("tripo-image requires one image or two to four selected views");
+  if(effectiveStrategy==="tripo-image"&&options.generateMultiviewFromSingleImage===true&&viewIds.length!==1)throw new TypeError("generateMultiviewFromSingleImage requires exactly one selected viewSourceId");
   if(effectiveStrategy==="tripo-image"&&viewIds.length>1&&options.confirmSameBuilding!==true)throw new TypeError("tripo-image multiview requires confirmSameBuilding=true after checking that every labelled view depicts the same physical building");
   await atomicJson(specPath,syncedSpec);
   runReport.inputs.mediaRecords=mediaRecords;
@@ -465,6 +471,8 @@ export async function runMediaToModelWorkflow(options){
     viewLabels:normalizedViewLabels,
     allowPaidProviderGeneration:config.allowPaidProviderGeneration,
     confirmExternalProviderProcessing:config.confirmExternalProviderProcessing,
+    generateMultiviewFromSingleImage:config.generateMultiviewFromSingleImage,
+    confirmSyntheticViewGeneration:config.confirmSyntheticViewGeneration,
     tripoModel:config.tripoModel,tripoTexture:config.tripoTexture,tripoPbr:config.tripoPbr,
     tripoGeometryQuality:config.tripoGeometryQuality,tripoTextureQuality:config.tripoTextureQuality,
     tripoPollIntervalMs:config.tripoPollIntervalMs,tripoMaxPollAttempts:config.tripoMaxPollAttempts,
