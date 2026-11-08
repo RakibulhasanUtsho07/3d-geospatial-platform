@@ -324,14 +324,28 @@ export async function runTripoImageGeneration(options = {}) {
           report.intermediateTaskProgress = Number.isFinite(task.progress) ? task.progress : null;
         },
       });
-      if (generatedViewsTask.type !== "image_to_multiview") {
-        throw new TypeError("Tripo image-to-multiview task type mismatch: expected image_to_multiview but received " + cleanMessage(generatedViewsTask.type, 80) + ".");
+      const acceptedImageToMultiviewTaskTypes = new Set(["image_to_multiview", "generate_multiview_image"]);
+      if (!acceptedImageToMultiviewTaskTypes.has(generatedViewsTask.type)) {
+        throw new TypeError("Tripo image-to-multiview task type mismatch: received " + cleanMessage(generatedViewsTask.type, 80) + ".");
+      }
+      const syntheticViewOutput = generatedViewsTask.output?.generate_multiview_image;
+      const availableSyntheticViews = Object.entries(syntheticViewOutput ?? {}).filter(([name, url]) => {
+        if (!["front_view_url", "left_view_url", "back_view_url", "right_view_url"].includes(name) || typeof url !== "string") return false;
+        try {
+          const parsed = new URL(url);
+          return parsed.protocol === "https:" && parsed.hostname === "cdn.tripo3d.ai" && !parsed.username && !parsed.password;
+        } catch {
+          return false;
+        }
+      }).map(([name]) => name);
+      if (!availableSyntheticViews.includes("front_view_url") || availableSyntheticViews.length < 2) {
+        throw new TypeError("Tripo image-to-multiview succeeded without a front view and at least one additional side view.");
       }
       report.syntheticViewProvenance = {
         ...report.syntheticViewProvenance,
         taskId: generatedViewsTask.task_id,
         taskType: generatedViewsTask.type,
-        outputViewsAvailable: Object.keys(generatedViewsTask.output?.generate_multiview_image ?? {}),
+        outputViewsAvailable: availableSyntheticViews,
         generatedViewsAreIndependentObservations: false,
         eligibleAsSurveyEvidence: false,
       };
