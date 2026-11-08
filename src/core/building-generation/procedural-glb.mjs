@@ -295,6 +295,9 @@ export function generateProceduralGlb(rawSpec) {
   const arcadeSpringY=arcadeHeight-arcadeOuterRadius;
   const arcadeOpeningRadius=Math.max(0.3,arcadeInnerRadius-0.08);
   const structuralOpenings=[];
+  let frontDoorPlacement=null;
+  let frontColumnsPlacement=null;
+  const balconyPlacementRecords=[];
   const wallOpeningsByFloorAndEdge = Array.from(
     { length: floorCount },
     () => edges.map(() => []),
@@ -385,12 +388,18 @@ export function generateProceduralGlb(rawSpec) {
       }
 
       if(spec.architecture.includeDoor&&e.len>=2.5&&ei===front&&floor===0&&!arcade.enabled){
-        const widthM=Math.min(1.05,e.len*0.25);
+        const leafCount=spec.architecture.doorLeafCount;
+        const widthM=leafCount===2?Math.min(1.75,e.len*0.34):Math.min(1.05,e.len*0.25);
         const doorHeight=Math.min(2.16,floorH-0.05);
         const opening={
           kind:"door",shape:spec.architecture.doorShape,edgeIndex:ei,floorIndex:floor,
-          centerAlongEdgeM:e.len/2,widthM,bottomM:floorY,topM:floorY+doorHeight,
+          centerAlongEdgeM:e.len/2,widthM,leafCount,bottomM:floorY,topM:floorY+doorHeight,
           ...(spec.architecture.doorShape==="arched"?{archRadiusM:Math.min(widthM/2,doorHeight*0.55)}:{})
+        };
+        frontDoorPlacement={
+          edgeIndex:ei,leafCount,widthM:Number(widthM.toFixed(3)),
+          heightM:Number(doorHeight.toFixed(3)),shape:spec.architecture.doorShape,
+          confidence:"estimated",source:"buildingSpec.architecture.doorLeafCount",reviewRequired:true
         };
         openings.push(opening);
         structuralOpenings.push(opening);
@@ -437,18 +446,26 @@ export function generateProceduralGlb(rawSpec) {
 
   if(spec.architecture.includeDoor&&edges[front].len>=2.5&&!arcade.enabled){
     const e=edges[front];
-    const widthM=Math.min(1.05,e.len*0.25);
+    const leafCount=spec.architecture.doorLeafCount;
+    const widthM=leafCount===2?Math.min(1.75,e.len*0.34):Math.min(1.05,e.len*0.25);
     const doorHeight=Math.min(2.16,floorH-0.05);
+    const leafGapM=leafCount===2?0.035:0;
     if(spec.architecture.doorShape==="arched"){
       const centerU=e.len/2;
       const archSegments=16;
-      const leafProfile=createFacadeOpeningProfile({
-        centerU,bottomM:0.035,widthM:Math.max(0.2,widthM-0.08),
-        heightM:doorHeight-0.07,shape:"arched",archSegments
-      });
-      addExtrudedFacadeProfile(geo,{
-        edge:e,baseY:0,profile:leafProfile,frontDepth:0.072,depthM:0.07,material:"door"
-      });
+      const leafWidthM=leafCount===2?Math.max(0.2,(widthM-leafGapM)/2-0.025):Math.max(0.2,widthM-0.08);
+      const leafCenters=leafCount===2
+        ?[centerU-(leafWidthM/2+leafGapM/2),centerU+(leafWidthM/2+leafGapM/2)]
+        :[centerU];
+      for(const leafCenterU of leafCenters){
+        const leafProfile=createFacadeOpeningProfile({
+          centerU:leafCenterU,bottomM:0.035,widthM:leafWidthM,
+          heightM:doorHeight-0.07,shape:"arched",archSegments
+        });
+        addExtrudedFacadeProfile(geo,{
+          edge:e,baseY:0,profile:leafProfile,frontDepth:0.072,depthM:0.07,material:"door"
+        });
+      }
 
       const frameOuter=createFacadeOpeningProfile({
         centerU,bottomM:0,widthM:widthM+0.14,
@@ -462,6 +479,11 @@ export function generateProceduralGlb(rawSpec) {
         edge:e,baseY:0,profile:frameOuter,holes:[frameInner],
         frontDepth:0.092,depthM:0.09,material:"frame"
       });
+      if(leafCount===2){
+        const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
+        const mullion=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09,0.002));
+        geo.box("frame",mullion.x,doorHeight/2,mullion.z,0.035,doorHeight-0.06,0.09,e.yaw);
+      }
     }else{
       const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
       const faceClearanceM=0.002;
@@ -470,7 +492,16 @@ export function generateProceduralGlb(rawSpec) {
       const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09,faceClearanceM));
       const leftJamb=offsetFacadePoint(edgePoint,e,-(widthM/2+0.035),surfaceInsertCenterOffset(0.09,faceClearanceM));
       const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2+0.035,surfaceInsertCenterOffset(0.09,faceClearanceM));
-      geo.box("door",doorPoint.x,doorCenterY,doorPoint.z,widthM,doorHeight,0.07,e.yaw);
+      if(leafCount===1){
+        geo.box("door",doorPoint.x,doorCenterY,doorPoint.z,widthM,doorHeight,0.07,e.yaw);
+      }else{
+        const leafWidthM=(widthM-leafGapM)/2;
+        for(const direction of [-1,1]){
+          const leafPoint=offsetFacadePoint(edgePoint,e,direction*(leafWidthM/2+leafGapM/2),surfaceInsertCenterOffset(0.07,faceClearanceM));
+          geo.box("door",leafPoint.x,doorCenterY,leafPoint.z,leafWidthM,doorHeight,0.07,e.yaw);
+        }
+        geo.box("frame",framePoint.x,doorCenterY,framePoint.z,0.035,doorHeight-0.04,0.09,e.yaw);
+      }
       geo.box("frame",framePoint.x,doorHeight+0.03,framePoint.z,widthM+0.14,0.08,0.09,e.yaw);
       geo.box("frame",leftJamb.x,doorCenterY,leftJamb.z,0.07,doorHeight,0.09,e.yaw);
       geo.box("frame",rightJamb.x,doorCenterY,rightJamb.z,0.07,doorHeight,0.09,e.yaw);
@@ -485,10 +516,59 @@ export function generateProceduralGlb(rawSpec) {
   if(structuralOpenings.length){
     warnings.push("Facade doors, windows and arches are structural openings, but their dimensions and positions are procedural estimates requiring independent review.");
   }
-  if(spec.architecture.balcony.enabled&&floorCount>1){const e=edges[front],b=spec.architecture.balcony,bays=Math.max(1,Math.min(6,Math.floor(e.len/Math.max(2.4,b.widthM+0.7)))),bw=Math.min(b.widthM,e.len/(bays+0.35));
-    for(let floor=1;floor<floorCount;floor+=b.everyFloors)for(let bay=0;bay<bays;bay++){const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*b.depthM*0.45,z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*b.depthM*0.45,y=floor*floorH+0.06,rx=x+e.out.x*b.depthM*0.85,rz=z+e.out.z*b.depthM*0.85;
-      geo.box("concrete",x,y,z,bw,0.12,b.depthM,e.yaw);geo.box("metal",rx,y+0.48,rz,bw,0.08,0.06,e.yaw);geo.box("metal",rx,y+0.24,rz,bw,0.04,0.045,e.yaw);
-      for(let r=0;r<=4;r++){const offset=-bw/2+bw*r/4,px=rx+Math.cos(e.yaw)*offset,pz=rz-Math.sin(e.yaw)*offset;geo.box("metal",px,y+0.28,pz,0.035,0.48,0.04);}
+  if(spec.architecture.balcony.enabled&&floorCount>1){
+    const e=edges[front],b=spec.architecture.balcony;
+    const bays=b.count??Math.max(1,Math.min(6,Math.floor(e.len/Math.max(2.4,b.widthM+0.7))));
+    const bw=Math.min(b.widthM,e.len/(bays+0.35));
+    const selectedStoreys=b.floors??Array.from(
+      {length:Math.ceil(Math.max(0,floorCount-1)/b.everyFloors)},
+      (_,index)=>2+index*b.everyFloors
+    ).filter(storey=>storey<=floorCount);
+    for(const storey of selectedStoreys){
+      const floor=storey-1;
+      for(let bay=0;bay<bays;bay++){
+        const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*b.depthM*0.45,z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*b.depthM*0.45,y=floor*floorH+0.06,rx=x+e.out.x*b.depthM*0.85,rz=z+e.out.z*b.depthM*0.85;
+        geo.box("concrete",x,y,z,bw,0.12,b.depthM,e.yaw);geo.box("metal",rx,y+0.48,rz,bw,0.08,0.06,e.yaw);geo.box("metal",rx,y+0.24,rz,bw,0.04,0.045,e.yaw);
+        for(let r=0;r<=4;r++){const offset=-bw/2+bw*r/4,px=rx+Math.cos(e.yaw)*offset,pz=rz-Math.sin(e.yaw)*offset;geo.box("metal",px,y+0.28,pz,0.035,0.48,0.04);}
+      }
+      balconyPlacementRecords.push({
+        storey,count:bays,widthM:Number(bw.toFixed(3)),depthM:Number(b.depthM.toFixed(3)),
+        confidence:"estimated",source:"buildingSpec.architecture.balcony",reviewRequired:true
+      });
+    }
+  }
+  const columnSpec=spec.architecture.frontColumns;
+  if(columnSpec.enabled&&columnSpec.count>0){
+    if(arcade.enabled){
+      warnings.push("Standalone front columns were omitted because the enabled front arcade already generates its own column system.");
+      frontColumnsPlacement={
+        edgeIndex:front,requestedCount:columnSpec.count,placedCount:0,skippedCount:columnSpec.count,
+        reason:"front-arcade-already-provides-columns",confidence:"estimated",reviewRequired:true
+      };
+    }else{
+      const e=edges[front];
+      const columnHeightM=Math.min(height,columnSpec.heightM??height);
+      let placedCount=0,skippedCount=0;
+      const doorWidthM=frontDoorPlacement?.widthM??0;
+      for(let index=0;index<columnSpec.count;index++){
+        const along=e.len*(index+1)/(columnSpec.count+1);
+        if(frontDoorPlacement&&Math.abs(along-e.len/2)<(doorWidthM+columnSpec.widthM)/2+0.05){
+          skippedCount++;
+          continue;
+        }
+        const facadePoint={x:e.p.x+(e.n.x-e.p.x)*along/e.len,z:e.p.z+(e.n.z-e.p.z)*along/e.len};
+        const center=offsetFacadePoint(facadePoint,e,0,surfaceInsertCenterOffset(columnSpec.depthM,0.002));
+        geo.box("concrete",center.x,columnHeightM/2,center.z,columnSpec.widthM,columnHeightM,columnSpec.depthM,e.yaw);
+        placedCount++;
+      }
+      frontColumnsPlacement={
+        edgeIndex:front,requestedCount:columnSpec.count,placedCount,skippedCount,
+        widthM:Number(columnSpec.widthM.toFixed(3)),depthM:Number(columnSpec.depthM.toFixed(3)),
+        heightM:Number(columnHeightM.toFixed(3)),confidence:"estimated",source:"buildingSpec.architecture.frontColumns",
+        reviewRequired:placedCount>0
+      };
+      if(placedCount>0)warnings.push("Front colonnade geometry is generated from operator-supplied count and dimensions; verify spacing and structural placement against reference evidence.");
+      if(skippedCount>0)warnings.push("One or more front columns were omitted to preserve clearance around the main entrance.");
     }
   }
   for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
@@ -604,12 +684,13 @@ export function generateProceduralGlb(rawSpec) {
     centerAlongEdgeM:Number(opening.centerAlongEdgeM.toFixed(3)),widthM:Number(opening.widthM.toFixed(3)),
     bottomM:Number(opening.bottomM.toFixed(3)),topM:Number(opening.topM.toFixed(3)),
     ...(opening.archRadiusM===undefined?{}:{archRadiusM:Number(opening.archRadiusM.toFixed(3))}),
+    ...(opening.leafCount===undefined?{}:{leafCount:opening.leafCount}),
     confidence:opening.confidence,source:opening.source,reviewRequired:opening.reviewRequired
   }));
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
-    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
+    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length,balconyPlacementCount:balconyPlacementRecords.length,frontColumnCount:frontColumnsPlacement?.placedCount??0},
     facadeOrientation,
     structuralOpenings:structuralOpeningRecords,
     facadeSelection:{
@@ -632,6 +713,9 @@ export function generateProceduralGlb(rawSpec) {
         insertFaceClearanceM:0.002
       },
       centralDome:domePlacement,
+      frontDoor:frontDoorPlacement,
+      frontColumns:frontColumnsPlacement,
+      balconies:balconyPlacementRecords,
       structuralOpenings:structuralOpeningRecords
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
