@@ -1,5 +1,7 @@
 # D3M-ENGINE-04 — Exact worker model-artifact provenance
 
+> **Mainline integration status — 2026-11-08:** This document records a historical feature/development slice. Its cumulative implementation is already included in main by [PR #409](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/409) (integration commit 0df5de366e6d2b732203f075f58de663bcf14b9d). Branch names, stacked-base instructions, draft/CI status and merge-order notes below describe the pre-integration history; do **not** merge or replay the old feature branch independently. The current single-image smoke/receipt versions are 1.6.0/1.2.0; vertical control evidence uses manifest schema 1.1.0 and georeference schema 1.1.0 where supplied. This software integration does **not** mean a real TripoSR/rembg worker-host inference or human/survey acceptance has occurred. Those operational gates remain **NOT RUN** until real evidence is recorded.
+
 **Tracking issue:** [#352](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/352)
 **Stack:** based on D3M-ENGINE-03 PR #351; do not promote this branch independently to `main` before its parent is integrated.
 **Status:** implementation branch in progress; exact-head CI and human review pending. No real worker-host inference is claimed.
@@ -53,6 +55,6 @@ Real worker-host inference, asset/model licence approval, independent survey/CAD
 
 ## Exact-head validation and follow-on boundary — 2026-11-04
 
-The D3M-ENGINE-04 head `53f9887834cfe960ea8875d6fc7d074430400611` completed exact-head Full CI successfully in [run #41789187557](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41789187557). The full Lint and production build job, including production viewport/API/browser verification, ended successfully. This validates the D3M-ENGINE-04 software contract and synthetic test paths only. PR #353 remains open/draft and stacked on PR #351; no merge to `main` was performed.
+Historical development record: the D3M-ENGINE-04 head `53f9887834cfe960ea8875d6fc7d074430400611` completed exact-head Full CI successfully in [run #41789187557](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41789187557). That run validated the D3M-ENGINE-04 software contract and synthetic test paths only. PR #353 was later closed unmerged as a standalone slice; its implementation was included by cumulative PR #409.
 
 The remaining evidence boundary identified by the next audit is tracked separately in [D3M-ENGINE-05 issue #354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/354): D3M-ENGINE-04 pre/post cache fingerprints do not alone prove which exact bytes the inference process handed to model-loader APIs. D3M-ENGINE-05 adds process-side loader receipts in smoke schema 1.2.0. See `docs/D3M-ENGINE-05-PROCESS-MODEL-LOAD-ATTESTATION.md` for its separate contract and limitations. Neither change constitutes real worker-host inference, independent review or publication eligibility.
